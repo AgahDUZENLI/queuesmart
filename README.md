@@ -30,7 +30,7 @@ This project is being built incrementally across a series of assignments:
 
 | Assignment | Focus | Status |
 |---|---|---|
-| [A1](./A1.md) | Initial Thoughts & System Design | ✅ Complete |
+| [A1](./docs/assignment-1/A1.md) | Initial Thoughts & System Design | ✅ Complete |
 | [A2](./A2.md) | UI/UX Design | 🔲 Not started |
 | [A3](./A3.md) | API Design | 🔲 Not started |
 | [A4](./A4.md) | Data Design | 🔲 Not started |
