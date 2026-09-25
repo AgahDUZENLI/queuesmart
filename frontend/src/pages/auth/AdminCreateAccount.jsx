@@ -12,7 +12,6 @@ function AdminCreateAccount({ goTo }) {
 
   function handleSubmit(event) {
     event.preventDefault()
-    // TODO: send to the backend once the API exists (A3)
     console.log('Create admin account', { firstName, lastName, placeName, email })
   }
 
