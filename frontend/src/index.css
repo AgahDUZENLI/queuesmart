@@ -1,155 +1,22 @@
-/* ===== Colors (change them here, used everywhere) ===== */
-:root {
-  --black: #141414;
-  --white: #ffffff;
-  --gray: #5e5e5e;
-  --border: #8a8a8a;
-  --line: #e6e6e6;
-}
-
-/* ===== Page ===== */
 body {
   margin: 0;
-  background: var(--white);
-  color: var(--black);
+  background: #ffffff;
+  color: #141414;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  font-size: 15px;
 }
 
-h1 {
-  margin: 0 0 24px;
-  font-size: 30px;
-  font-weight: 600;
-}
-
-p {
-  margin: 0;
-}
-
-/* ===== Layout (AuthLayout) ===== */
-.header {
-  height: 64px;
-  padding: 0 48px;
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid var(--line);
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.logo {
-  color: var(--black);
-  text-decoration: none;
-}
-
-.container {
-  max-width: 400px;
-  margin: 0 auto;
-  padding: 80px 16px;
-}
-
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #141414;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .two-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-}
-
-/* ===== Button ===== */
-.button {
-  width: 100%;
-  height: 44px;
-  border: 1px solid var(--black);
-  border-radius: 6px;
-  background: var(--black);
-  color: var(--white);
-  font: inherit;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.button.secondary {
-  border-color: var(--border);
-  background: var(--white);
-  color: var(--black);
-}
-
-/* Looks like a link, but it is a button because it switches pages */
-.link-button {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--black);
-  font: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-/* ===== Toggle ===== */
-.toggle {
-  display: flex;
-  margin-bottom: 24px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.toggle button {
-  flex: 1;
-  height: 40px;
-  border: 0;
-  background: var(--white);
-  color: var(--black);
-  font: inherit;
-  cursor: pointer;
-}
-
-.toggle button.selected {
-  background: var(--black);
-  color: var(--white);
-}
-
-/* ===== TextInput ===== */
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field label {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.field input {
-  height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font: inherit;
-  font-size: 16px;
-}
-
-.hint {
-  font-size: 13px;
-  color: var(--gray);
-}
-
-/* ===== Checkbox ===== */
-.checkbox {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.checkbox input {
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--black);
 }
