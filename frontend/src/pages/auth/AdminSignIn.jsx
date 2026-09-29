@@ -9,7 +9,7 @@ function AdminSignIn({ goTo }) {
 
   function handleSubmit(event) {
     event.preventDefault()
-    console.log('Admin sign in', { email })
+    goTo('admin-overview')
   }
 
   return (
