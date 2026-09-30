@@ -4,6 +4,7 @@
   --gray: #5e5e5e;
   --border: #8a8a8a;
   --line: #e6e6e6;
+  --red: #b42318;
 }
 
 /* ===== Page ===== */
@@ -137,6 +138,15 @@ form {
 .hint {
   font-size: 13px;
   color: var(--gray);
+}
+
+.field input.invalid {
+  border-color: var(--red);
+}
+
+.error {
+  font-size: 13px;
+  color: var(--red);
 }
 
 /* ===== Checkbox ===== */
