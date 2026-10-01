@@ -152,3 +152,37 @@ form {
   margin: 0;
   accent-color: var(--black);
 }
+
+/* ===== Dynamic Table ===== */
+
+.table-data {
+  border-collapse: collapse; /* Collapses double cell borders into one */
+  width: 100%;
+  font-family: sans-serif;
+  margin: 20px 0;
+  font-size: 0.95em;
+}
+
+/* Style the table header */
+.table-data thead tr {
+  background-color: #009879; /* Clean teal accent color */
+  color: #ffffff;
+  text-align: left;
+  font-weight: bold;
+}
+
+/* Add padding to headers and cells */
+.table-data th,
+.table-data td {
+  padding: 12px 15px;
+}
+
+/* Add light borders below each body row */
+.table-data tbody tr {
+  border-bottom: 1px solid #dddddd;
+}
+
+/* Optional: Subtle background color on alternating rows (zebra striping) */
+.table-data tbody tr:nth-of-type(even) {
+  background-color: #f3f3f3;
+}
