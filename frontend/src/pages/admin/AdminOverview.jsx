@@ -35,11 +35,13 @@ function AdminOverview({ services, today, totalWaiting, openServices, onCreate, 
                   <th scope="row">{service.name}</th><td>{service.waiting}</td>
                   <td>{service.wait ? `${service.wait} min` : '—'}</td><td>{service.staff}</td>
                   <td><AdminStatus status={service.status} /></td>
-                  <td className="admin-row-actions">
-                    <button className="admin-text-action" type="button" onClick={() => onManage(service.id)}>Manage</button>
-                    <button className="admin-text-action" type="button" onClick={() => onToggleStatus(service)}>
-                      {service.status === 'Open' ? 'Pause' : 'Open'}
-                    </button>
+                  <td>
+                    <div className="admin-row-actions">
+                      <button className="admin-text-action" type="button" onClick={() => onManage(service.id)}>Manage</button>
+                      <button className="admin-text-action" type="button" onClick={() => onToggleStatus(service)}>
+                        {service.status === 'Open' ? 'Pause' : 'Open'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
