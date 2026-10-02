@@ -1,0 +1,132 @@
+.notifications {
+  width: 100%;
+  max-width: 700px;
+  margin-top: 30px;
+}
+
+.notifications-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.notifications-header h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.notifications-header p {
+  margin: 5px 0 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.notification-count {
+  background: #111;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notification-card {
+  display: flex;
+  gap: 15px;
+  padding: 16px;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  background: white;
+  transition: 0.2s ease;
+}
+
+.notification-card.unread {
+  border-left: 4px solid #111;
+  background: #fafafa;
+}
+
+.notification-icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f1f1;
+  border-radius: 50%;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.notification-content {
+  flex: 1;
+}
+
+.notification-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.notification-type {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.notification-time {
+  font-size: 12px;
+  color: #888;
+}
+
+.notification-content p {
+  margin: 8px 0 10px;
+  font-size: 14px;
+  color: #333;
+}
+
+.mark-read-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.mark-read-button:hover {
+  opacity: 0.7;
+}
+
+.empty-notifications {
+  padding: 30px;
+  text-align: center;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  color: #777;
+}
+
+.notification-tests {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.notification-tests button {
+  padding: 10px 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+}
+
+.notification-tests button:hover {
+  background: #f5f5f5;
+}
