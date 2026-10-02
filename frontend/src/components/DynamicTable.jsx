@@ -27,6 +27,7 @@
     tableCaption: A string that will be displayed as the caption/title of the table.
     tableData: An array of JSON objects that will be used to populate the table rows and columns.
 */
+/*
 function DynamicTable({ tableCaption, tableData }) {
     if (!tableData || tableData.length === 0) {
         return (
@@ -53,7 +54,55 @@ function DynamicTable({ tableCaption, tableData }) {
 
                 <tbody>
                     {tableData.map((row, rowIndex) => (
-                        <tr key={rowIndex}>
+                        <tr 
+                            key={rowIndex}
+                            onClick={() => handleRowClick(row)}
+                        >
+                            {colNames.map((colName) => (
+                                <td key={colName}>
+                                    {row[colName]}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+export default DynamicTable;*/
+
+function DynamicTable({ tableCaption, tableData, onRowClick }) {
+    if (!tableData || tableData.length === 0) {
+        return (
+            <div>
+                <p>No table data available.</p>
+            </div>
+        );
+    }
+
+    const colNames = Object.keys(tableData[0]);
+
+    return (
+        <div>
+            <table id="data" className="table-data">
+                <caption>{tableCaption}</caption>
+
+                <thead>
+                    <tr>
+                        {colNames.map((colName) => (
+                            <th key={colName}>{colName}</th>
+                        ))}
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {tableData.map((row, rowIndex) => (
+                        <tr
+                            key={rowIndex}
+                            onClick={() => onRowClick(row)}
+                        >
                             {colNames.map((colName) => (
                                 <td key={colName}>
                                     {row[colName]}

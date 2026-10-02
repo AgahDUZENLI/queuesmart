@@ -4,6 +4,7 @@
   --gray: #5e5e5e;
   --border: #8a8a8a;
   --line: #e6e6e6;
+  --red: #b42318;
 }
 
 /* ===== Page ===== */
@@ -16,6 +17,7 @@ body {
 }
 
 h1 {
+  text-align: center;
   margin: 0 0 24px;
   font-size: 30px;
   font-weight: 600;
@@ -139,6 +141,15 @@ form {
   color: var(--gray);
 }
 
+.field input.invalid {
+  border-color: var(--red);
+}
+
+.error {
+  font-size: 13px;
+  color: var(--red);
+}
+
 /* ===== Checkbox ===== */
 .checkbox {
   display: flex;
@@ -151,6 +162,13 @@ form {
   height: 18px;
   margin: 0;
   accent-color: var(--black);
+}
+
+/* ===== Sign Out Button ===== */
+.sign-out {
+  position: absolute;
+  right: 10%;
+  font-size: 14px;
 }
 
 /* ===== Dynamic Table ===== */
@@ -171,6 +189,10 @@ form {
   font-weight: bold;
 }
 
+.table-data tbody tr {
+    cursor: pointer;
+}
+
 /* Add padding to headers and cells */
 .table-data th,
 .table-data td {
@@ -185,4 +207,9 @@ form {
 /* Optional: Subtle background color on alternating rows (zebra striping) */
 .table-data tbody tr:nth-of-type(even) {
   background-color: #f3f3f3;
+}
+
+/*highlight rows hovering over*/
+.table-data tbody tr:hover {
+    background-color: #919191;
 }
