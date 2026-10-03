@@ -5,6 +5,7 @@
   --border: #8a8a8a;
   --line: #e6e6e6;
   --red: #b42318;
+  --green: #1a7f5a;
 }
 
 /* ===== Page ===== */
@@ -164,52 +165,360 @@ form {
   accent-color: var(--black);
 }
 
-/* ===== Sign Out Button ===== */
-.sign-out {
-  position: absolute;
-  right: 10%;
+/* ===== UserLayout (same look as the admin nav) ===== */
+.nav {
+  min-height: 64px;
+  padding: 0 48px;
+  display: flex;
+  align-items: stretch;
+  gap: 44px;
+  border-bottom: 1px solid var(--line);
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  color: var(--black);
+  font-size: 18px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.nav-links {
+  display: flex;
+  gap: 32px;
+}
+
+.nav-link {
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--gray);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.nav-link.active {
+  border-bottom-color: var(--black);
+  color: var(--black);
+  font-weight: 600;
+}
+
+.nav-account {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-left: auto;
+  color: var(--gray);
+}
+
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 54px 32px 72px;
+}
+
+.page-heading {
+  margin-bottom: 36px;
+}
+
+.page-heading h1 {
+  margin: 0 0 8px;
+  text-align: left;
+}
+
+.page-heading p {
+  color: var(--gray);
+  font-size: 16px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 40px;
+}
+
+.page h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* Buttons inside pages size to their text instead of full width */
+.page .button {
+  width: auto;
+  padding: 0 18px;
+}
+
+/* ===== DynamicTable (same look as the admin tables) ===== */
+.table-data {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table-data caption {
+  margin-bottom: 12px;
+  text-align: left;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.table-data thead {
+  border-bottom: 1px solid var(--black);
+  color: var(--gray);
+}
+
+.table-data th,
+.table-data td {
+  padding: 15px 12px;
+}
+
+.table-data th:first-child,
+.table-data td:first-child {
+  padding-left: 0;
+}
+
+.table-data tbody tr {
+  border-bottom: 1px solid var(--line);
+}
+
+.table-data tbody tr.clickable {
+  cursor: pointer;
+}
+
+.table-data tbody tr.clickable:hover {
+  background: #f4f5f3;
+}
+
+/* ===== User pages ===== */
+.two-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: start;
+  margin-bottom: 40px;
+}
+
+.button-row {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0 12px;
+}
+
+.button.danger {
+  border-color: var(--border);
+  background: var(--white);
+  color: var(--red);
+}
+
+.notice {
+  margin-bottom: 24px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--black);
+  background: #f4f5f3;
+}
+
+/* Services list on the home page */
+.service-list {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.service-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  border-bottom: 1px solid var(--line);
+}
+
+.service-list li div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Radio list on the join queue page */
+.service-picker {
+  max-width: 640px;
+  margin: 0 0 24px;
+  padding: 0;
+  border: 0;
+}
+
+.service-picker legend {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.service-picker label {
+  display: grid;
+  grid-template-columns: 24px 1fr 100px 110px;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.service-picker label.disabled {
+  color: var(--gray);
+  cursor: not-allowed;
+}
+
+.service-picker input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--black);
+}
+
+/* Ticket details on the queue status page */
+.facts {
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+
+.facts div {
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.facts dt {
+  color: var(--gray);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.status-steps {
+  display: flex;
+  gap: 8px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.status-steps li {
+  flex: 1;
+  padding: 8px 0;
+  border-top: 3px solid var(--line);
+  color: var(--gray);
   font-size: 14px;
 }
 
-/* ===== Dynamic Table ===== */
-
-.table-data {
-  border-collapse: collapse; /* Collapses double cell borders into one */
-  width: 100%;
-  font-family: sans-serif;
-  margin: 20px 0;
-  font-size: 0.95em;
+.status-steps li.current {
+  border-top-color: var(--green);
+  color: var(--black);
+  font-weight: 600;
 }
 
-/* Style the table header */
-.table-data thead tr {
-  background-color: #009879; /* Clean teal accent color */
-  color: #ffffff;
-  text-align: left;
-  font-weight: bold;
+/* ===== WaitWheel ===== */
+.wait-wheel .tick { stroke: #d0d0d0; stroke-width: 1.4; stroke-linecap: round; }
+.wait-wheel .tick.long { stroke: #9a9a9a; stroke-width: 2; }
+.wait-wheel .tick.done { stroke: var(--green); stroke-width: 2; }
+.wait-wheel .wheel-track { fill: none; stroke: #efefec; stroke-width: 12; }
+.wait-wheel .wheel-progress { fill: none; stroke: var(--green); stroke-width: 12; stroke-linecap: round; }
+.wait-wheel text { text-anchor: middle; fill: var(--black); }
+.wait-wheel .wheel-number { font-size: 64px; font-weight: 600; }
+.wait-wheel .wheel-unit { font-size: 15px; fill: var(--gray); }
+.wait-wheel .wheel-label { font-size: 13px; font-family: ui-monospace, monospace; }
+
+/* ===== Small screens ===== */
+.nav-link,
+.nav-account {
+  white-space: nowrap;
 }
 
-.table-data tbody tr {
-    cursor: pointer;
+.wait-wheel {
+  max-width: 100%;
+  height: auto;
 }
 
-/* Add padding to headers and cells */
-.table-data th,
-.table-data td {
-  padding: 12px 15px;
+@media (max-width: 900px) {
+  .nav {
+    flex-wrap: wrap;
+    gap: 0 24px;
+    padding: 0 20px;
+  }
+
+  .nav-links {
+    order: 3;
+    width: 100%;
+    gap: 20px;
+    overflow-x: auto;
+  }
+
+  .nav-link {
+    min-height: 48px;
+  }
+
+  .page {
+    padding: 32px 20px 48px;
+  }
+
+  .two-panels {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .service-picker label {
+    grid-template-columns: 24px 1fr auto;
+  }
+
+  .service-picker label .hint {
+    display: none;
+  }
 }
 
-/* Add light borders below each body row */
-.table-data tbody tr {
-  border-bottom: 1px solid #dddddd;
+/* ===== Notification bar (under the user nav) ===== */
+.notification-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 48px;
+  border-bottom: 1px solid var(--line);
+  background: #f4f5f3;
 }
 
-/* Optional: Subtle background color on alternating rows (zebra striping) */
-.table-data tbody tr:nth-of-type(even) {
-  background-color: #f3f3f3;
+@media (max-width: 900px) {
+  .notification-bar {
+    padding: 12px 20px;
+  }
 }
 
-/*highlight rows hovering over*/
-.table-data tbody tr:hover {
-    background-color: #919191;
+.in-line {
+  color: var(--green);
+  font-weight: 600;
+}
+
+/* Place dropdown on the join queue page */
+.place-field {
+  max-width: 640px;
+  margin-bottom: 28px;
+}
+
+.place-field select {
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--black);
+  font: inherit;
+  font-size: 16px;
 }

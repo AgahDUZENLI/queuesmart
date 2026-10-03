@@ -8,15 +8,17 @@ import UserDashboard from './pages/user/UserDashboard'
 import JoinQueue from './pages/user/JoinQueue'
 import QueueStatus from './pages/user/QueueStatus'
 import UserHistory from './pages/user/UserHistory'
+import useUserQueue from './hooks/useUserQueue'
 
 function App() {
   const [page, setPage] = useState('sign-in')
-  
+  const queue = useUserQueue()
+
   if (page === 'create-account') return <CreateAccount goTo={setPage} />
-  if (page === 'user-dashboard') return <UserDashboard goTo={setPage} />
-  if (page === 'join-queue') return <JoinQueue goTo={setPage} />
-  if (page === 'queue-status') return <QueueStatus goTo={setPage} />
-  if (page === 'user-history') return <UserHistory goTo={setPage} />
+  if (page === 'user-dashboard') return <UserDashboard goTo={setPage} queue={queue} />
+  if (page === 'join-queue') return <JoinQueue goTo={setPage} queue={queue} />
+  if (page === 'queue-status') return <QueueStatus goTo={setPage} queue={queue} />
+  if (page === 'user-history') return <UserHistory goTo={setPage} queue={queue} />
   if (page === 'admin-sign-in') return <AdminSignIn goTo={setPage} />
   if (page === 'admin-create-account') return <AdminCreateAccount goTo={setPage} />
   if (page.startsWith('admin-')) return <AdminWorkspace goTo={setPage} initialPage={page.slice(6)} />

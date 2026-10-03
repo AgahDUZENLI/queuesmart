@@ -5,104 +5,79 @@
 */
 
 import { useState } from "react";
-import DynamicTable from "../../components/DynamicTable.jsx";
+import UserLayout from "../../components/UserLayout";
+import Button from "../../components/Button";
+import WaitWheel from "../../components/WaitWheel";
+import { ordinal, queueStatus, waitProgress } from "../../utils/queueRules";
 
+const steps = ["Waiting", "Almost ready", "Served"];
 
-function QueueStatus({goTo}) { 
-    //temporary data below...
-    const [tableData, setTableData] = useState([
-        { 
-            "Service Name": "Service 1", 
-            "Current Queue Position": 3, 
-            "Average Wait Time": "10 mins", 
-            "Status Updates": "waiting"
-        },
-        { 
-            "Service Name": "Service 2", 
-            "Current Queue Position": 2, 
-            "Average Wait Time": "5 mins", 
-            "Status Updates": "almost ready"
-        },
-        { 
-            "Service Name": "Service 3", 
-            "Current Queue Position": 4, 
-            "Average Wait Time": "15 mins", 
-            "Status Updates": "served"
-        }
-    ]);
+function QueueStatus({ goTo, queue }) {
+    const { ticket, service, place, minutesLeft, leave, nextPersonServed } = queue;
+    const [servedAt, setServedAt] = useState("");
 
-    function handleRowClick(rowData) {
-        const confirmed = window.confirm(
-            "Are you sure you want to leave the queue for: " +
-            rowData["Service Name"] +
-            "\nYour current position in the queue is: " +
-            rowData["Current Queue Position"]
+    // Not in a queue (never joined, left, or already served)
+    if (!ticket) {
+        return (
+            <UserLayout title="Queue status" subtitle={servedAt ? "Status: Served" : "You are not in a queue right now."} active="queue-status" goTo={goTo} queue={queue}>
+                <section className="section">
+                    {servedAt && <p>You were served at {servedAt}. Thanks for visiting!</p>}
+                    <Button onClick={() => goTo("join-queue")}>Join a queue</Button>
+                </section>
+            </UserLayout>
         );
+    }
 
-        if (confirmed) {
-            setTableData(currentData =>
-                currentData.filter(row =>
-                    row["Service Name"] !== rowData["Service Name"]
-                )
-            );
+    const status = queueStatus(ticket.peopleAhead);
 
-            console.log("Leaving queue:", rowData["Service Name"]);
+    function handleNext() {
+        if (ticket.peopleAhead === 0) {
+            setServedAt(new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
         }
+        nextPersonServed();
+    }
+
+    function handleLeave() {
+        const confirmed = window.confirm(
+            "Are you sure you want to leave the queue for " + service.name + " at " + place.name + "?\nYou will lose your place in line."
+        );
+        if (confirmed) leave();
     }
 
     return (
-        <div>
-            <header className="header">
-              <h1>Queue Status</h1>
+        <UserLayout title={service.name} subtitle={`${place.name} · Status: ${status}`} active="queue-status" goTo={goTo} queue={queue}>
+            <div className="two-panels">
+                <WaitWheel
+                    minutesLeft={minutesLeft}
+                    progress={waitProgress(ticket, minutesLeft)}
+                    label={ticket.peopleAhead === 0 ? "You're next" : `${ticket.peopleAhead} ahead of you`}
+                />
 
-              <p>
-                <button type="button" className="sign-out" onClick={() => goTo('sign-in')}>
-                  Sign out
-                </button>
-              </p>
-            </header>
-            <main className="container">
-                <h3>Links to Other Pages</h3>
-                <p>
-                    To view your dashboard {' '}
-                    <button type="button" className="link-button" onClick={() => goTo('user-dashboard')}>
-                        click me
-                    </button>!
-                </p>
+                <div>
+                    <dl className="facts">
+                        <div><dt>Ticket</dt><dd>{ticket.number}</dd></div>
+                        <div><dt>Position</dt><dd>{ordinal(ticket.peopleAhead + 1)} in line</dd></div>
+                        <div><dt>Estimated wait</dt><dd>{ticket.peopleAhead === 0 ? "You're next" : `about ${minutesLeft} min`}</dd></div>
+                        <div><dt>Joined</dt><dd>{ticket.joinedAt}</dd></div>
+                        <div><dt>Where</dt><dd>{place.name}, {service.room}</dd></div>
+                    </dl>
 
-                <p>
-                    To view your past services {' '}
-                    <button type="button" className="link-button" onClick={() => goTo('user-history')}>
-                        click me
-                    </button>!
-                </p>
+                    <ol className="status-steps" aria-label="Status">
+                        {steps.map((step) => (
+                            <li key={step} className={step === status ? "current" : ""}>{step}</li>
+                        ))}
+                    </ol>
 
-                <p>
-                    To join a service {' '}
-                    <button type="button" className="link-button" onClick={() => goTo('join-queue')}>
-                        click me
-                    </button>!
-                </p>
-
-                <br/>
-              
-                <p>
-                    To leave a queue, select the service you want to leave from the table below...
-                </p>
-
-                <br/>
-
-              <p>
-                <DynamicTable 
-                  tableCaption="Queue Status Overview" 
-                  tableData={tableData}
-                  onRowClick={handleRowClick}
-                   />
-              </p>
-            </main>
-            
-        </div>
-          
+                    <div className="button-row">
+                        <Button variant="secondary" onClick={handleNext}>
+                            {ticket.peopleAhead === 0 ? "Simulate: my turn" : "Simulate: next person served"}
+                        </Button>
+                        <Button variant="danger" onClick={handleLeave}>Leave queue</Button>
+                    </div>
+                    <p className="hint">The simulate button stands in for live updates until the backend exists.</p>
+                </div>
+            </div>
+        </UserLayout>
     );
 }
 

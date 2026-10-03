@@ -101,7 +101,8 @@ function DynamicTable({ tableCaption, tableData, onRowClick }) {
                     {tableData.map((row, rowIndex) => (
                         <tr
                             key={rowIndex}
-                            onClick={() => onRowClick(row)}
+                            className={onRowClick ? "clickable" : ""}
+                            onClick={onRowClick ? () => onRowClick(row) : undefined}
                         >
                             {colNames.map((colName) => (
                                 <td key={colName}>

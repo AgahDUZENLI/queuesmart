@@ -1,113 +1,94 @@
-/* 
-    1. Select a service
+/*
+    1. Select a place, then a service
     2. View estimated wait time
     3. Join or leave a queue
 */
 
 import { useState } from "react";
-import DynamicTable from "../../components/DynamicTable.jsx";
+import UserLayout from "../../components/UserLayout";
+import Button from "../../components/Button";
+import { checkCanJoin, estimateWait, ordinal } from "../../utils/queueRules";
 
 
-function JoinQueue({goTo}) { 
-    const [selectedRow, setSelectedRow] = useState(null);
+function JoinQueue({ goTo, queue }) {
+    const { places, services, ticket, service, place, join } = queue;
+    const [placeId, setPlaceId] = useState(queue.pickedPlaceId || places[0].id);
+    const [selectedId, setSelectedId] = useState("");
+    const [error, setError] = useState("");
+    const placeServices = services.filter((s) => s.placeId === placeId);
+    const selected = placeServices.find((s) => s.id === selectedId);
 
-    function handleRowClick(rowData) {
-      setSelectedRow(rowData);
-  }
+    function changePlace(newPlaceId) {
+        setPlaceId(newPlaceId);
+        setSelectedId("");
+        setError("");
+    }
 
     function handleJoinQueue() {
-        if (!selectedRow) {
-            alert("Please select a service to join the queue.");
+        const problem = checkCanJoin(selected, ticket);
+        if (problem) {
+            setError(problem);
+            return;
         }
-        else  {
-            alert(`You have joined the queue for ${selectedRow["Service Name"]}!`); 
-        }
+        join(selected);
+        goTo("queue-status");
     }
 
     return (
-        <div>
-            <header className="header">
-              <h1>Join Queue</h1>
-
-              <p>
-                <button type="button" className="sign-out" onClick={() => goTo('sign-in')}>
-                  Sign out
-                </button>
-              </p>
-            </header>
-            <main className="container">
-                <h3>Links to Other Pages</h3>
-                <p>
-                    To view your dashboard {' '}
-                    <button type="button" className="link-button" onClick={() => goTo('user-dashboard')}>
-                        click me
-                    </button>!
-                </p>
-
-                <p>
-                    To view your queue status {' '}
-                    <button type="button" className="link-button" onClick={() => goTo('queue-status')}>
-                        click me
-                    </button>!
-                </p>
-
-                <p>
-                    To view your past services {' '}
-                    <button type="button" className="link-button" onClick={() => goTo('user-history')}>
-                        click me
-                    </button>!
-                </p>
-                
-                <br/>
-
-                <p>
-                    To join a queue, click on a service from the table below...
-                </p>
-
-                <br/>
-
-                <p>
-                    {selectedRow && (
-                        <p>
-                            Are you sure you want to join the queue for: {selectedRow ? selectedRow["Service Name"] : "None"}?<br/>
-                            Your position in the queue will be: {selectedRow ? selectedRow["Current Queue Length"] + 1 : "N/A"}<br/>
-                            The estimated wait time is: {selectedRow ? selectedRow["Average Wait Time"] : "N/A"}<br/>
-                        </p>
-                    )}
-                </p>
-
-                <br/>
-
-                <p>
-                    <button type="button" className="join-queue" onClick={handleJoinQueue}>
-                        Confirm Join Queue
+        <UserLayout title="Join a queue" subtitle="Choose a place, then a service. You’ll see the wait before you join." active="join-queue" goTo={goTo} queue={queue}>
+            {ticket && (
+                <p className="notice">
+                    You are already in line for {service.name} at {place.name}. You can only be in one queue at a time.{" "}
+                    <button type="button" className="link-button" onClick={() => goTo("queue-status")}>
+                        View or leave your queue
                     </button>
                 </p>
+            )}
 
-                <br/>
+            <div className="field place-field">
+                <label htmlFor="place">1. Place</label>
+                <select id="place" value={placeId} onChange={(event) => changePlace(event.target.value)}>
+                    {places.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name} ({p.kind})</option>
+                    ))}
+                </select>
+            </div>
 
+            <fieldset className="service-picker">
+                <legend>2. Service</legend>
+                {placeServices.length === 0 && (
+                    <p className="hint">This place hasn’t added any services yet.</p>
+                )}
+                {placeServices.map((s) => (
+                    <label key={s.id} className={s.status === "Open" ? "" : "disabled"}>
+                        <input
+                            type="radio"
+                            name="service"
+                            value={s.id}
+                            checked={selectedId === s.id}
+                            disabled={s.status !== "Open"}
+                            onChange={() => { setSelectedId(s.id); setError(""); }}
+                        />
+                        <span className="service-name">{s.name}</span>
+                        <span className="hint">{s.waiting} waiting</span>
+                        <span>{s.status === "Open" ? `about ${s.wait} min` : s.status}</span>
+                    </label>
+                ))}
+            </fieldset>
+
+            {selected && (
                 <p>
-                    To leave a queue, follow the link to the queue status page and leave the queue there.
+                    You’d be <strong>{ordinal(selected.waiting + 1)} in line</strong>, with an estimated wait of{" "}
+                    <strong>about {estimateWait(selected, selected.waiting)} minutes</strong>.
                 </p>
+            )}
 
-                <p>
-                    <DynamicTable 
-                    tableCaption="Available Services" 
-                    tableData={[
-                        { "Service Name": "Service 1", "Current Queue Length": 5, "Average Wait Time": "10 mins" },
-                        { "Service Name": "Service 2", "Current Queue Length": 3, "Average Wait Time": "5 mins" },
-                        { "Service Name": "Service 3", "Current Queue Length": 8, "Average Wait Time": "15 mins" },
-                        { "Service Name": "Service 4", "Current Queue Length": 25, "Average Wait Time": "8 mins" },
-                        { "Service Name": "Service 5", "Current Queue Length": 2, "Average Wait Time": "9 mins" },
-                        { "Service Name": "Service 6", "Current Queue Length": 6, "Average Wait Time": "23 mins" }
-                        ]}
-                    onRowClick={handleRowClick}
-                    />
-                </p>
-            </main>
-            
-        </div>
-          
+            {error && <p className="error" role="alert">{error}</p>}
+
+            <div className="button-row">
+                <Button onClick={handleJoinQueue}>Join queue</Button>
+            </div>
+        </UserLayout>
     );
 }
 
