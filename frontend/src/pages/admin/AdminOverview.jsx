@@ -1,5 +1,6 @@
 import Button from '../../components/Button'
 import AdminStatus from './AdminStatus'
+import JoinCodeCard from './JoinCodeCard'
 
 function Metric({ label, value }) {
   return <div className="admin-metric"><span>{label}</span><strong>{value}</strong></div>
@@ -15,6 +16,7 @@ function AdminOverview({ services, today, totalWaiting, openServices, onCreate, 
         </div>
         <Button onClick={onCreate}>New service</Button>
       </div>
+      <JoinCodeCard />
       <section className="admin-metrics" aria-label="Today's queue summary">
         <Metric label="People waiting" value={totalWaiting} />
         <Metric label="Average wait" value="14 min" />

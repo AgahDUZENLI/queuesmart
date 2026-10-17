@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { places, services, initialTicket, initialHistory, initialNotifications } from '../data/userQueue'
+import { mockQueueNumbers, initialTicket, initialHistory, initialNotifications } from '../data/userQueue'
+import * as api from '../api'
 import { estimateWait, ordinal } from '../utils/queueRules'
 
 function today() {
@@ -10,14 +11,51 @@ function timeNow() {
   return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
+// Adds line length, wait and room to a backend service (mock data until the Queue module exists)
+function withQueueNumbers(service) {
+  const mock = mockQueueNumbers.find((m) => m.name === service.name)
+  return { ...service, waiting: mock?.waiting ?? 0, wait: mock?.wait ?? 0, room: mock?.room ?? '' }
+}
+
 // Everything the user pages share: places, services, the user's ticket, history and notifications.
 function useUserQueue() {
+  const [places, setPlaces] = useState([]) // places the user added with a code or QR scan
+  const [services, setServices] = useState([]) // services at those places
+  const [placeError, setPlaceError] = useState('')
   const [ticket, setTicket] = useState(initialTicket)
   const [history, setHistory] = useState(initialHistory)
   const [notifications, setNotifications] = useState(initialNotifications)
   const [pickedPlaceId, setPickedPlaceId] = useState('') // place chosen on Home before opening Join a queue
   const service = ticket ? services.find((s) => s.id === ticket.serviceId) : null
   const place = service ? places.find((p) => p.id === service.placeId) : null
+
+  // Loads the user's places and their services from the backend
+  async function loadPlaces() {
+    const saved = await api.getSavedPlaces()
+    const lists = await Promise.all(saved.places.map((p) => api.getServices(p.id)))
+    setPlaces(saved.places)
+    setServices(lists.flatMap((list) => list.services.map(withQueueNumbers)))
+  }
+
+  // Adds a place by its join code. Returns true when it worked.
+  async function addPlace(code) {
+    setPlaceError('')
+    try {
+      const { place } = await api.addPlace(code)
+      await loadPlaces()
+      setPickedPlaceId(place.id)
+      return true
+    } catch (error) {
+      setPlaceError(error.fields.code || error.message)
+      return false
+    }
+  }
+
+  async function removePlace(placeId) {
+    await api.removePlace(placeId)
+    if (pickedPlaceId === placeId) setPickedPlaceId('')
+    await loadPlaces()
+  }
 
   function addToHistory(outcome) {
     setHistory((current) => [{ Date: today(), Place: place.name, Service: service.name, Outcome: outcome }, ...current])
@@ -71,8 +109,8 @@ function useUserQueue() {
   const minutesLeft = service ? estimateWait(service, ticket.peopleAhead) : 0
 
   return {
-    places, services, ticket, service, place, minutesLeft, history, notifications, pickedPlaceId,
-    join, leave, nextPersonServed, markAsRead, setPickedPlaceId,
+    places, services, ticket, service, place, minutesLeft, history, notifications, pickedPlaceId, placeError,
+    join, leave, nextPersonServed, markAsRead, setPickedPlaceId, loadPlaces, addPlace, removePlace,
   }
 }
 
