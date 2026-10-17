@@ -22,7 +22,10 @@ Many organizations struggle with long queues and poor visibility into wait times
 
 ## Tech Stack
 
-_TBD — to be filled in as the team decides on frontend/backend/database choices._
+- **Frontend:** React + Vite
+- **Backend:** Node.js + Express, in-memory data (see [backend/README.md](./backend/README.md))
+- **Tests:** Jest + Supertest
+- **Database:** TBD (A4)
 
 ## Project Status
 

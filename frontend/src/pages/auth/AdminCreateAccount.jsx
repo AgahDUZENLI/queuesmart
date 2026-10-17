@@ -3,6 +3,7 @@ import AuthLayout from '../../components/AuthLayout'
 import TextInput from '../../components/TextInput'
 import Button from '../../components/Button'
 import { checkEmail, checkName, checkPassword, hasErrors } from '../../utils/validation'
+import { register } from '../../api'
 
 function AdminCreateAccount({ goTo }) {
   const [firstName, setFirstName] = useState('')
@@ -12,7 +13,7 @@ function AdminCreateAccount({ goTo }) {
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState({})
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     const newErrors = {
       firstName: checkName(firstName, 'First name'),
@@ -24,7 +25,12 @@ function AdminCreateAccount({ goTo }) {
     setErrors(newErrors)
     if (hasErrors(newErrors)) return
 
-    goTo('admin-overview')
+    try {
+      await register({ role: 'admin', firstName, lastName, placeName, email, password })
+      goTo('admin-overview')
+    } catch (error) {
+      setErrors({ ...error.fields, form: hasErrors(error.fields) ? '' : error.message })
+    }
   }
 
   return (
@@ -66,6 +72,7 @@ function AdminCreateAccount({ goTo }) {
           maxLength={64}
           error={errors.password}
         />
+        {errors.form && <p className="error" role="alert">{errors.form}</p>}
         <Button type="submit">Create admin account</Button>
         <p>
           Already an admin?{' '}

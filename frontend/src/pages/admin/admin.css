@@ -304,3 +304,21 @@
   .admin-field-grid { gap: 10px; }
   .editor-footer { align-items: flex-start; flex-direction: column; }
 }
+/* Join code + QR code on the overview */
+.join-code-card {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.join-code-card h2 {
+  margin: 0;
+}
+
+.join-code {
+  margin: 4px 0;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 4px;
+}
