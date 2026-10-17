@@ -13,22 +13,8 @@ import useUserQueue from './hooks/useUserQueue'
 function App() {
   const [page, setPage] = useState('sign-in')
   const queue = useUserQueue()
-  // Join code from a scanned QR link, like http://localhost:5173/?code=123456
-  const [joinCode, setJoinCode] = useState(() => new URLSearchParams(window.location.search).get('code'))
 
-  async function handleUserSignedIn() {
-    if (joinCode) {
-      window.history.replaceState(null, '', '/') // take ?code= out of the address bar
-      setJoinCode(null)
-      await queue.addPlace(joinCode)
-      setPage('join-queue')
-    } else {
-      await queue.loadPlaces()
-      setPage('user-dashboard')
-    }
-  }
-
-  if (page === 'create-account') return <CreateAccount goTo={setPage} onSignedIn={handleUserSignedIn} />
+  if (page === 'create-account') return <CreateAccount goTo={setPage} />
   if (page === 'user-dashboard') return <UserDashboard goTo={setPage} queue={queue} />
   if (page === 'join-queue') return <JoinQueue goTo={setPage} queue={queue} />
   if (page === 'queue-status') return <QueueStatus goTo={setPage} queue={queue} />
@@ -37,7 +23,7 @@ function App() {
   if (page === 'admin-create-account') return <AdminCreateAccount goTo={setPage} />
   if (page.startsWith('admin-')) return <AdminWorkspace goTo={setPage} initialPage={page.slice(6)} />
 
-  return <SignIn goTo={setPage} onSignedIn={handleUserSignedIn} joinCode={joinCode} />
+  return <SignIn goTo={setPage} />
 }
 
 export default App

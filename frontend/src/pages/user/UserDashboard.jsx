@@ -41,14 +41,6 @@ function UserDashboard({ goTo, queue }) {
 
                 <section className="section">
                     <h2>Places</h2>
-                    {places.length === 0 && (
-                        <p>
-                            You haven’t added any places yet.{' '}
-                            <button type="button" className="link-button" onClick={() => goTo('join-queue')}>
-                                Add one with its code
-                            </button>
-                        </p>
-                    )}
                     <ul className="service-list">
                         {places.map((p) => {
                             const openCount = services.filter((s) => s.placeId === p.id && s.status === 'Open').length
@@ -57,7 +49,7 @@ function UserDashboard({ goTo, queue }) {
                                     <div>
                                         <strong>{p.name}</strong>
                                         <span className="hint">
-                                            Code {p.id} · {openCount > 0 ? `${openCount} services open` : 'No services open'}
+                                            {p.kind} · {openCount > 0 ? `${openCount} services open` : 'No services yet'}
                                         </span>
                                     </div>
                                     {/* One queue at a time: no buttons while you are in line */}

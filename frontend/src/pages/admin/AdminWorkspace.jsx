@@ -3,7 +3,6 @@ import './admin.css'
 import AdminDashboard from './AdminDashboard'
 import QueueManagement from './QueueManagement'
 import ServiceManagement from './ServiceManagement'
-import { signOut } from '../../api'
 
 const initialServices = [
   {
@@ -175,7 +174,7 @@ function AdminWorkspace({ goTo, initialPage = 'overview' }) {
         </nav>
         <div className="admin-account">
           <span>Jordan Park, staff</span>
-          <button className="admin-signout" type="button" onClick={() => { signOut(); goTo('admin-sign-in') }}>Sign out</button>
+          <button className="admin-signout" type="button" onClick={() => goTo('admin-sign-in')}>Sign out</button>
         </div>
       </header>
 

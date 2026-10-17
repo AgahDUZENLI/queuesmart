@@ -4,9 +4,8 @@ import TextInput from '../../components/TextInput'
 import Checkbox from '../../components/Checkbox'
 import Button from '../../components/Button'
 import { checkEmail, checkName, checkPassword, hasErrors } from '../../utils/validation'
-import { register } from '../../api'
 
-function CreateAccount({ goTo, onSignedIn }) {
+function CreateAccount({ goTo }) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -14,7 +13,7 @@ function CreateAccount({ goTo, onSignedIn }) {
   const [emailMe, setEmailMe] = useState(true)
   const [errors, setErrors] = useState({})
 
-  async function handleSubmit(event) {
+  function handleSubmit(event) {
     event.preventDefault()
     const newErrors = {
       firstName: checkName(firstName, 'First name'),
@@ -25,12 +24,7 @@ function CreateAccount({ goTo, onSignedIn }) {
     setErrors(newErrors)
     if (hasErrors(newErrors)) return
 
-    try {
-      await register({ firstName, lastName, email, password, emailMe })
-      onSignedIn()
-    } catch (error) {
-      setErrors({ ...error.fields, form: hasErrors(error.fields) ? '' : error.message })
-    }
+    goTo('user-dashboard')
   }
 
   return (
@@ -68,7 +62,6 @@ function CreateAccount({ goTo, onSignedIn }) {
           checked={emailMe}
           onChange={setEmailMe}
         />
-        {errors.form && <p className="error" role="alert">{errors.form}</p>}
         <Button type="submit">Create account</Button>
         <p>
           Already have an account?{' '}

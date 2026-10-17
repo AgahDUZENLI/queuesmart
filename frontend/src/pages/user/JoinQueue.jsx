@@ -1,5 +1,4 @@
 /*
-    0. Add a place by its code (or by scanning its QR code)
     1. Select a place, then a service
     2. View estimated wait time
     3. Join or leave a queue
@@ -8,43 +7,21 @@
 import { useState } from "react";
 import UserLayout from "../../components/UserLayout";
 import Button from "../../components/Button";
-import TextInput from "../../components/TextInput";
-import QrScanner from "../../components/QrScanner";
 import { checkCanJoin, estimateWait, ordinal } from "../../utils/queueRules";
 
 
 function JoinQueue({ goTo, queue }) {
     const { places, services, ticket, service, place, join } = queue;
-    const placeId = queue.pickedPlaceId || places[0]?.id;
+    const [placeId, setPlaceId] = useState(queue.pickedPlaceId || places[0].id);
     const [selectedId, setSelectedId] = useState("");
     const [error, setError] = useState("");
-    const [code, setCode] = useState("");
-    const [scanning, setScanning] = useState(false);
     const placeServices = services.filter((s) => s.placeId === placeId);
     const selected = placeServices.find((s) => s.id === selectedId);
 
     function changePlace(newPlaceId) {
-        queue.setPickedPlaceId(newPlaceId);
+        setPlaceId(newPlaceId);
         setSelectedId("");
         setError("");
-    }
-
-    async function addPlace(placeCode) {
-        if (await queue.addPlace(placeCode)) {
-            setCode("");
-            setSelectedId("");
-        }
-    }
-
-    function handleAddPlace(event) {
-        event.preventDefault();
-        addPlace(code);
-    }
-
-    function handleScan(scannedCode) {
-        setScanning(false);
-        setCode(scannedCode);
-        addPlace(scannedCode);
     }
 
     function handleJoinQueue() {
@@ -68,44 +45,18 @@ function JoinQueue({ goTo, queue }) {
                 </p>
             )}
 
-            <form className="add-place" onSubmit={handleAddPlace} noValidate>
-                <TextInput
-                    id="place-code"
-                    label="Add a place"
-                    value={code}
-                    onChange={setCode}
-                    placeholder="e.g. 123456"
-                    hint="Enter the 6-digit code from the front desk, or scan the place’s QR code."
-                    maxLength={6}
-                    error={queue.placeError}
-                />
-                <Button type="submit" variant="secondary">Add place</Button>
-                <Button variant="secondary" onClick={() => setScanning(true)}>Scan QR code</Button>
-            </form>
-
-            {scanning && <QrScanner onScan={handleScan} onClose={() => setScanning(false)} />}
-
-            {places.length === 0 ? (
-                <p className="hint">Add a place to see its services.</p>
-            ) : (
-                <div className="field place-field">
-                    <label htmlFor="place">1. Place</label>
-                    <select id="place" value={placeId} onChange={(event) => changePlace(Number(event.target.value))}>
-                        {places.map((p) => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
-                    {!ticket && (
-                        <button type="button" className="link-button" onClick={() => queue.removePlace(placeId)}>
-                            Remove this place
-                        </button>
-                    )}
-                </div>
-            )}
+            <div className="field place-field">
+                <label htmlFor="place">1. Place</label>
+                <select id="place" value={placeId} onChange={(event) => changePlace(event.target.value)}>
+                    {places.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name} ({p.kind})</option>
+                    ))}
+                </select>
+            </div>
 
             <fieldset className="service-picker">
                 <legend>2. Service</legend>
-                {places.length > 0 && placeServices.length === 0 && (
+                {placeServices.length === 0 && (
                     <p className="hint">This place hasn’t added any services yet.</p>
                 )}
                 {placeServices.map((s) => (

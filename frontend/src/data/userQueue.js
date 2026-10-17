@@ -1,8 +1,15 @@
 // Mock data for the user side.
-// Places and services now come from the backend. These mock line numbers stay
-// until the Queue module is built, and are matched to services by name.
+// A place is an organization that uses QueueSmart (a school office, a shop, a clinic...).
+// Each place has its own services. Only Student Services Center has services for now.
+export const places = [
+  { id: 'student-services', name: 'Student Services Center', kind: 'University office' },
+  { id: 'tire-shop', name: 'Main Street Tire Shop', kind: 'Auto repair' },
+  { id: 'clinic', name: 'Eastside Health Clinic', kind: 'Walk-in clinic' },
+]
+
+// Same services and numbers as the admin side.
 // waiting = people in line now, wait = estimated wait in minutes for someone joining now.
-export const mockQueueNumbers = [
+export const services = [
   { id: 'advising', placeId: 'student-services', name: 'Academic Advising', room: 'Room 210', status: 'Open', waiting: 6, wait: 18 },
   { id: 'financial-aid', placeId: 'student-services', name: 'Financial Aid', room: 'Room 114', status: 'Open', waiting: 4, wait: 22 },
   { id: 'registrar', placeId: 'student-services', name: 'Registrar', room: 'Room 102', status: 'Open', waiting: 2, wait: 6 },

@@ -3,9 +3,8 @@ import AuthLayout from '../../components/AuthLayout'
 import TextInput from '../../components/TextInput'
 import Button from '../../components/Button'
 import { checkEmail, checkRequired, hasErrors } from '../../utils/validation'
-import { login, DEMO_USER } from '../../api'
 
-function SignIn({ goTo, onSignedIn, joinCode }) {
+function SignIn({ goTo }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState({})
@@ -19,22 +18,12 @@ function SignIn({ goTo, onSignedIn, joinCode }) {
     setErrors(newErrors)
     if (hasErrors(newErrors)) return
 
-    signIn(email, password)
-  }
-
-  async function signIn(signInEmail, signInPassword) {
-    try {
-      await login(signInEmail, signInPassword, 'user')
-      onSignedIn()
-    } catch (error) {
-      setErrors({ ...error.fields, form: hasErrors(error.fields) ? '' : error.message })
-    }
+    goTo('user-dashboard')
   }
 
   return (
     <AuthLayout title="Sign in" role="User" onRoleChange={() => goTo('admin-sign-in')}>
       <form onSubmit={handleSubmit} noValidate>
-        {joinCode && <p className="notice">Sign in to add the place with code {joinCode}.</p>}
         <TextInput
           id="email"
           label="Email"
@@ -54,7 +43,6 @@ function SignIn({ goTo, onSignedIn, joinCode }) {
           required
           error={errors.password}
         />
-        {errors.form && <p className="error" role="alert">{errors.form}</p>}
         <Button type="submit">Sign in</Button>
         <p>
           No account yet?{' '}
@@ -62,10 +50,10 @@ function SignIn({ goTo, onSignedIn, joinCode }) {
             Create one
           </button>
         </p>
-        {/* Demo shortcut: signs in with the demo account from backend/src/demo.js */}
+        {/* Demo shortcut: skips the form until the backend exists (A3) */}
         <p>
-          <button type="button" className="link-button" onClick={() => signIn(DEMO_USER.email, DEMO_USER.password)}>
-            Sign in as demo user
+          <button type="button" className="link-button" onClick={() => goTo('user-dashboard')}>
+            Skip sign in (demo)
           </button>
         </p>
       </form>
