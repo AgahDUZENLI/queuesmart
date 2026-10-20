@@ -4,6 +4,7 @@
 
 const express = require('express')
 const { data, newId } = require('./data')
+const { queueSummary } = require('./queues')
 const { requireAuth, requireAdmin } = require('./auth')
 const { checkText, checkWholeNumber, checkOneOf, checkTime, checkTrueFalse, findErrors } = require('./validation')
 
@@ -78,7 +79,8 @@ const router = express.Router()
 // GET /api/services, or /api/services?placeId=1 for one place's services
 router.get('/', (req, res) => {
   const placeId = Number(req.query.placeId)
-  const services = req.query.placeId ? data.services.filter((s) => s.placeId === placeId) : data.services
+  const listed = req.query.placeId ? data.services.filter((s) => s.placeId === placeId) : data.services
+  const services = listed.map((service) => ({ ...service, ...queueSummary(service) }))
   res.json({ services })
 })
 
@@ -116,7 +118,7 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
 router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const service = findOwnService(req, res)
   if (!service) return
-
+  data.queueEntries = data.queueEntries.filter((entry) => entry.serviceId !== service.id)
   data.services = data.services.filter((s) => s.id !== service.id)
   res.status(204).end()
 })

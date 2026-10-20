@@ -24,9 +24,9 @@ function UserDashboard({ goTo, queue }) {
                             <WaitWheel
                                 minutesLeft={minutesLeft}
                                 progress={waitProgress(ticket, minutesLeft)}
-                                label={`${ticket.number} · ${ordinal(ticket.peopleAhead + 1)} in line`}
+                                label={ticket.status === 'serving' ? `${ticket.number} · Being served` : `${ticket.number} · ${ordinal(ticket.peopleAhead + 1)} in line`}
                             />
-                            <p>{service.name} at {place.name}, {service.room} · joined {ticket.joinedAt}</p>
+                            <p>{service.name} at {place.name}{service.room ? `, ${service.room}` : ''} · joined {ticket.joinedAt}</p>
                             <Button variant="secondary" onClick={() => goTo('queue-status')}>
                                 View ticket
                             </Button>

@@ -1,14 +1,13 @@
 // Business rules for joining and waiting in a queue.
 
-// Minutes it takes, on average, for one person ahead of you to be served
+// Basic estimate: each person ahead takes one service-duration interval.
 export function minutesPerPerson(service) {
-  if (service.waiting === 0) return 5
-  return service.wait / service.waiting
+  return Math.max(0, Number(service.duration) || 0)
 }
 
 // Estimated wait = people ahead of you × minutes per person
 export function estimateWait(service, peopleAhead) {
-  return Math.round(peopleAhead * minutesPerPerson(service))
+  return Math.ceil(Math.max(0, peopleAhead) * minutesPerPerson(service))
 }
 
 // Returns why the user can't join, or '' when they can

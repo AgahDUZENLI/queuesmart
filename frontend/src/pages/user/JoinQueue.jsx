@@ -10,7 +10,7 @@ import UserLayout from "../../components/UserLayout";
 import Button from "../../components/Button";
 import TextInput from "../../components/TextInput";
 import QrScanner from "../../components/QrScanner";
-import { checkCanJoin, estimateWait, ordinal } from "../../utils/queueRules";
+import { checkCanJoin, ordinal } from "../../utils/queueRules";
 
 
 function JoinQueue({ goTo, queue }) {
@@ -21,7 +21,7 @@ function JoinQueue({ goTo, queue }) {
     const [code, setCode] = useState("");
     const [scanning, setScanning] = useState(false);
     const placeServices = services.filter((s) => s.placeId === placeId);
-    const selected = placeServices.find((s) => s.id === selectedId);
+    const selected = placeServices.find((s) => String(s.id) === String(selectedId));
 
     function changePlace(newPlaceId) {
         queue.setPickedPlaceId(newPlaceId);
@@ -47,14 +47,18 @@ function JoinQueue({ goTo, queue }) {
         addPlace(scannedCode);
     }
 
-    function handleJoinQueue() {
+    async function handleJoinQueue() {
         const problem = checkCanJoin(selected, ticket);
         if (problem) {
             setError(problem);
             return;
         }
-        join(selected);
-        goTo("queue-status");
+        try {
+            await join(selected);
+            goTo("queue-status");
+        } catch (joinError) {
+            setError(joinError.message);
+        }
     }
 
     return (
@@ -114,7 +118,7 @@ function JoinQueue({ goTo, queue }) {
                             type="radio"
                             name="service"
                             value={s.id}
-                            checked={selectedId === s.id}
+                            checked={String(selectedId) === String(s.id)}
                             disabled={s.status !== "Open"}
                             onChange={() => { setSelectedId(s.id); setError(""); }}
                         />
@@ -128,10 +132,11 @@ function JoinQueue({ goTo, queue }) {
             {selected && (
                 <p>
                     You’d be <strong>{ordinal(selected.waiting + 1)} in line</strong>, with an estimated wait of{" "}
-                    <strong>about {estimateWait(selected, selected.waiting)} minutes</strong>.
+                    <strong>about {selected.wait} minutes</strong>.
                 </p>
             )}
 
+            {queue.queueError && <p className="error" role="alert">{queue.queueError}</p>}
             {error && <p className="error" role="alert">{error}</p>}
 
             <div className="button-row">

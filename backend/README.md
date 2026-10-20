@@ -26,6 +26,7 @@ Demo accounts, places and services are loaded on startup from `src/demo.js`. Dem
 | `src/auth.js` | Authentication routes plus `requireAuth` / `requireAdmin` |
 | `src/places.js` | Places, join codes and users' saved places |
 | `src/services.js` | Service management routes |
+| `src/queues.js` | Queue tickets, priority ordering, serving and wait estimates |
 
 ## Auth API
 
@@ -74,6 +75,14 @@ Each service belongs to the place of the admin who created it. Admins can only c
 Send the token as `Authorization: Bearer <token>`.
 
 Errors look like `{ "error": "Validation failed.", "fields": { "email": "Email is required." } }`. Status codes: 400 for invalid input, 401 when not signed in or the password is wrong, 403 for the wrong role, 409 when the email is taken.
+
+## Queue API
+
+Users join an open service with `POST /api/queues/:serviceId/join`, view their active ticket and estimate with `GET /api/queues/me`, and leave with `DELETE /api/queues/tickets/:ticketId`. A user can have one active ticket at a time.
+
+Admins can view queues at their place with `GET /api/queues/mine`, call the next person with `POST /api/queues/:serviceId/next`, complete the current ticket with `POST /api/queues/:serviceId/complete`, and mark a no-show with `POST /api/queues/:serviceId/no-show`. Waiting tickets can be reprioritized or reordered within their priority group with `PATCH /api/queues/:serviceId/tickets/:ticketId`, using `{ "priority": "High" }` or `{ "position": 1 }`. New tickets default to `Normal`; equal-priority tickets are served in arrival order.
+
+Wait estimates use the simple rule `people ahead × service duration`. The estimate for a new arrival includes the currently serving ticket, if any. Estimates and queue counts are also included in `GET /api/services?placeId=...`.
 
 ## Adding a module
 

@@ -8,6 +8,7 @@ const data = {
   sessions: {}, // token -> user id
   places: [], // offices, shops, clinics... each run by an admin. id = 6-digit join code
   services: [],
+  queueEntries: [],
 }
 
 // A random, unused 6-digit id, e.g. 482913. Used for users, places and
@@ -26,6 +27,7 @@ function reset() {
   data.sessions = {}
   data.places = []
   data.services = []
+  data.queueEntries = []
 }
 
 module.exports = { data, newId, reset }
