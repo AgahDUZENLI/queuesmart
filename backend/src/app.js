@@ -3,6 +3,7 @@ const cors = require('cors')
 const auth = require('./auth')
 const places = require('./places')
 const services = require('./services')
+const queues = require('./queues')
 
 function createApp() {
   const app = express()
@@ -15,6 +16,7 @@ function createApp() {
   app.use('/api/auth', auth.router)
   app.use('/api/places', places.router)
   app.use('/api/services', services.router)
+  app.use('/api/queues', queues.router)
 
   app.use((req, res) => res.status(404).json({ error: 'Not found.' }))
 

@@ -20,6 +20,7 @@ async function request(method, path, body) {
   if (!response.ok) {
     const error = new Error(data.error || 'Something went wrong.')
     error.fields = data.fields || {}
+    error.status = response.status
     throw error
   }
   return data
@@ -51,3 +52,16 @@ export const addPlace = (code) => request('POST', '/api/places/saved', { code })
 export const removePlace = (placeId) => request('DELETE', `/api/places/saved/${placeId}`)
 export const getMyPlace = () => request('GET', '/api/places/mine')
 export const getServices = (placeId) => request('GET', `/api/services?placeId=${placeId}`)
+export const createService = (service) => request('POST', '/api/services', service)
+export const updateService = (serviceId, updates) => request('PUT', `/api/services/${serviceId}`, updates)
+export const deleteService = (serviceId) => request('DELETE', `/api/services/${serviceId}`)
+
+export const getMyQueueTicket = () => request('GET', '/api/queues/me')
+export const joinQueue = (serviceId) => request('POST', `/api/queues/${serviceId}/join`)
+export const leaveQueue = (ticketId) => request('DELETE', `/api/queues/tickets/${ticketId}`)
+export const getAdminQueues = () => request('GET', '/api/queues/mine')
+export const serveNext = (serviceId) => request('POST', `/api/queues/${serviceId}/next`)
+export const completeServing = (serviceId) => request('POST', `/api/queues/${serviceId}/complete`)
+export const markNoShow = (serviceId) => request('POST', `/api/queues/${serviceId}/no-show`)
+export const updateQueueTicket = (serviceId, ticketId, updates) => request('PATCH', `/api/queues/${serviceId}/tickets/${ticketId}`, updates)
+export const removeQueueTicket = (ticketId) => request('DELETE', `/api/queues/tickets/${ticketId}`)

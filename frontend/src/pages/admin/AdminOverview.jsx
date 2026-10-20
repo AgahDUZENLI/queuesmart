@@ -6,22 +6,22 @@ function Metric({ label, value }) {
   return <div className="admin-metric"><span>{label}</span><strong>{value}</strong></div>
 }
 
-function AdminOverview({ services, today, totalWaiting, openServices, onCreate, onManage, onToggleStatus }) {
+function AdminOverview({ services, today, totalWaiting, openServices, averageWait, currentlyServing, averageDuration, onCreate, onManage, onToggleStatus }) {
   return (
     <>
       <div className="admin-page-heading">
         <div>
           <h1>Overview</h1>
-          <p>Student Services Center · {today}</p>
+          <p>{today}</p>
         </div>
         <Button onClick={onCreate}>New service</Button>
       </div>
       <JoinCodeCard />
       <section className="admin-metrics" aria-label="Today's queue summary">
         <Metric label="People waiting" value={totalWaiting} />
-        <Metric label="Average wait" value="14 min" />
-        <Metric label="Served today" value="86" />
-        <Metric label="Average visit" value="11 min" />
+        <Metric label="Average wait" value={`${averageWait} min`} />
+        <Metric label="Currently serving" value={currentlyServing} />
+        <Metric label="Expected visit" value={`${averageDuration} min`} />
       </section>
       <section className="admin-section">
         <div className="admin-section-heading">
@@ -30,12 +30,12 @@ function AdminOverview({ services, today, totalWaiting, openServices, onCreate, 
         </div>
         <div className="admin-table-wrap">
           <table className="admin-table overview-table">
-            <thead><tr><th>Service</th><th>Waiting</th><th>Wait</th><th>Staff</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th>Service</th><th>Waiting</th><th>Wait</th><th>Visit length</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {services.map((service) => (
                 <tr key={service.id}>
                   <th scope="row">{service.name}</th><td>{service.waiting}</td>
-                  <td>{service.wait ? `${service.wait} min` : '—'}</td><td>{service.staff}</td>
+                  <td>{service.wait ? `${service.wait} min` : '—'}</td><td>{service.duration} min</td>
                   <td><AdminStatus status={service.status} /></td>
                   <td>
                     <div className="admin-row-actions">

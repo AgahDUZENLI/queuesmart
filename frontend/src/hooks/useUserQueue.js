@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { mockQueueNumbers, initialTicket, initialHistory, initialNotifications } from '../data/userQueue'
+import { useEffect, useState } from 'react'
+import { initialTicket, initialHistory, initialNotifications } from '../data/userQueue'
 import * as api from '../api'
-import { estimateWait, ordinal } from '../utils/queueRules'
+import { ordinal } from '../utils/queueRules'
 
 function today() {
   return new Date().toLocaleDateString('en-CA') // local date as YYYY-MM-DD
@@ -11,10 +11,14 @@ function timeNow() {
   return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
-// Adds line length, wait and room to a backend service (mock data until the Queue module exists)
-function withQueueNumbers(service) {
-  const mock = mockQueueNumbers.find((m) => m.name === service.name)
-  return { ...service, waiting: mock?.waiting ?? 0, wait: mock?.wait ?? 0, room: mock?.room ?? '' }
+function toTicket(ticket) {
+  if (!ticket) return null
+  return {
+    ...ticket,
+    number: ticket.ticket,
+    waitAtJoin: ticket.estimatedWaitMinutes,
+    joinedAt: new Date(ticket.joinedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+  }
 }
 
 // Everything the user pages share: places, services, the user's ticket, history and notifications.
@@ -23,9 +27,12 @@ function useUserQueue() {
   const [services, setServices] = useState([]) // services at those places
   const [placeError, setPlaceError] = useState('')
   const [ticket, setTicket] = useState(initialTicket)
+  const [lastOutcome, setLastOutcome] = useState('')
+  const [queueError, setQueueError] = useState('')
   const [history, setHistory] = useState(initialHistory)
   const [notifications, setNotifications] = useState(initialNotifications)
   const [pickedPlaceId, setPickedPlaceId] = useState('') // place chosen on Home before opening Join a queue
+  const activeTicketId = ticket?.id
   const service = ticket ? services.find((s) => s.id === ticket.serviceId) : null
   const place = service ? places.find((p) => p.id === service.placeId) : null
 
@@ -34,7 +41,11 @@ function useUserQueue() {
     const saved = await api.getSavedPlaces()
     const lists = await Promise.all(saved.places.map((p) => api.getServices(p.id)))
     setPlaces(saved.places)
-    setServices(lists.flatMap((list) => list.services.map(withQueueNumbers)))
+    setServices(lists.flatMap((list) => list.services.map((service) => ({ ...service, room: service.room || '' }))))
+    const current = await api.getMyQueueTicket()
+    setQueueError('')
+    setTicket(toTicket(current.ticket))
+    setLastOutcome(current.ticket ? '' : current.recent?.status || '')
   }
 
   // Adds a place by its join code. Returns true when it worked.
@@ -70,47 +81,79 @@ function useUserQueue() {
     setNotifications((current) => current.map((n) => (n.id === id ? { ...n, read: true } : n)))
   }
 
-  // Joining puts you at the end of the line
-  function join(newService) {
-    setTicket({
-      serviceId: newService.id,
-      number: `${newService.name[0]}-${String(newService.waiting + 41).padStart(3, '0')}`,
-      peopleAhead: newService.waiting,
-      waitAtJoin: newService.wait,
-      joinedAt: timeNow(),
-    })
+  // The backend creates the ticket and calculates its current position.
+  async function join(newService) {
+    setQueueError('')
+    const result = await api.joinQueue(newService.id)
+    setTicket(toTicket(result.ticket))
+    setLastOutcome('')
+    setServices((current) => current.map((service) => (
+      service.id === result.ticket.serviceId ? { ...service, ...result.ticket.service } : service
+    )))
     const newPlace = places.find((p) => p.id === newService.placeId)
-    notify('Queue update', `You joined ${newService.name} at ${newPlace.name}. You are ${ordinal(newService.waiting + 1)} in line.`)
+    notify('Queue update', `You joined ${newService.name} at ${newPlace.name}. You are ${ordinal(result.ticket.position)} in line.`)
   }
 
-  function leave() {
+  async function leave() {
+    if (!ticket) return
+    setQueueError('')
+    try {
+      await api.leaveQueue(ticket.id)
+    } catch (error) {
+      setQueueError(error.message)
+      throw error
+    }
     addToHistory('Left queue')
     notify('Queue update', `You left the queue for ${service.name}.`)
     setTicket(null)
+    setLastOutcome('left')
   }
 
-  // UI simulation: the person in front of you is served
-  function nextPersonServed() {
-    const ahead = ticket.peopleAhead - 1
-    if (ahead >= 0) {
-      setTicket({ ...ticket, peopleAhead: ahead })
-      if (ahead === 0) {
-        notify('Status change', `Almost ready: you are next for ${service.name}. Head to ${service.room}.`)
-      } else {
-        notify('Queue update', `You moved up to ${ordinal(ahead + 1)} in line for ${service.name}.`)
+  const minutesLeft = ticket?.estimatedWaitMinutes ?? 0
+
+  useEffect(() => {
+    if (!activeTicketId) return undefined
+    let active = true
+
+    async function refreshTicket() {
+      try {
+        const result = await api.getMyQueueTicket()
+        if (!active) return
+        setQueueError('')
+        if (result.ticket) {
+          const updated = toTicket(result.ticket)
+          setTicket(updated)
+          setServices((current) => current.map((item) => (
+            item.id === updated.serviceId ? { ...item, ...result.ticket.service } : item
+          )))
+        } else {
+          setTicket(null)
+          setLastOutcome(result.recent?.status || 'inactive')
+          if (result.recent?.status === 'served') notify('Status change', `You have been served at ${result.recent.service?.name || 'the service'}.`)
+          else if (result.recent?.status === 'no-show') notify('Status change', 'Your ticket was marked as a no-show.')
+          else if (result.recent?.status === 'removed') notify('Status change', 'Your ticket was removed from the queue.')
+        }
+      } catch (error) {
+        if (!active) return
+        if (error.status === 401 || error.status === 403) {
+          setTicket(null)
+          setQueueError('')
+          return
+        }
+        setQueueError(error.message)
       }
-    } else {
-      addToHistory('Served')
-      notify('Status change', `Served: it's your turn at ${service.name}.`)
-      setTicket(null)
     }
-  }
 
-  const minutesLeft = service ? estimateWait(service, ticket.peopleAhead) : 0
+    const intervalId = setInterval(refreshTicket, 5000)
+    return () => {
+      active = false
+      clearInterval(intervalId)
+    }
+  }, [activeTicketId])
 
   return {
     places, services, ticket, service, place, minutesLeft, history, notifications, pickedPlaceId, placeError,
-    join, leave, nextPersonServed, markAsRead, setPickedPlaceId, loadPlaces, addPlace, removePlace,
+    queueError, lastOutcome, join, leave, markAsRead, setPickedPlaceId, loadPlaces, addPlace, removePlace,
   }
 }
 

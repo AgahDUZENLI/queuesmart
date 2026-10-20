@@ -1,7 +1,7 @@
 import Button from '../../components/Button'
 import AdminStatus from './AdminStatus'
 
-function QueueManagement({ services, selectedService, nowServing, onSelectService, onUpdateService, onSetNowServing, onServeNext, onMoveQueue, onRemoveFromQueue, onCreateService }) {
+function QueueManagement({ services, selectedService, nowServing, onSelectService, onUpdateService, onServeNext, onComplete, onNoShow, onMoveQueue, onUpdatePriority, onRemoveFromQueue, onCreateService }) {
   if (!selectedService) {
     return (
       <section className="empty-admin-state">
@@ -32,34 +32,51 @@ function QueueManagement({ services, selectedService, nowServing, onSelectServic
       </div>
       <section className="now-serving" aria-label="Currently serving">
         <div className="serving-person">
-          <p className="admin-muted">Now serving at Desk 2</p>
-          <p><strong>{nowServing.ticket}</strong><span>{nowServing.name}</span></p>
-          <p className="admin-muted">Started {nowServing.started} · 4 min</p>
+          <p className="admin-muted">{nowServing ? 'Now serving' : 'No one is being served'}</p>
+          {nowServing && <p><strong>{nowServing.ticket}</strong><span>{nowServing.name}</span></p>}
+          {nowServing && <p className="admin-muted">Started {nowServing.started}</p>}
         </div>
         <div className="serving-actions">
-          <Button variant="secondary" onClick={() => onSetNowServing({ ticket: 'No show', name: 'Call next guest', started: 'Now' })}>No-show</Button>
-          <Button variant="secondary" onClick={() => onSetNowServing({ ticket: 'Complete', name: nowServing.name, started: 'Served' })}>Done</Button>
-          <Button onClick={onServeNext}>Call next{selectedService.queue[0] ? `: ${selectedService.queue[0].ticket}` : ''}</Button>
+          <Button variant="secondary" disabled={!nowServing} onClick={onNoShow}>No-show</Button>
+          <Button variant="secondary" disabled={!nowServing} onClick={onComplete}>Done</Button>
+          <Button disabled={Boolean(nowServing) || selectedService.queue.length === 0} onClick={onServeNext}>
+            Call next{selectedService.queue[0] ? `: ${selectedService.queue[0].ticket}` : ''}
+          </Button>
         </div>
       </section>
       <section className="admin-section queue-section">
         <div className="admin-section-heading">
           <h2>Waiting</h2>
-          <span className="admin-muted">High priority goes first, then by join time.</span>
+          <span className="admin-muted">Priority ranks first; arrival order breaks ties.</span>
         </div>
         <div className="admin-table-wrap">
           <table className="admin-table queue-table">
             <thead><tr><th>#</th><th>Ticket</th><th>Name</th><th>Priority</th><th>Waiting</th><th><span className="sr-only">Queue actions</span></th></tr></thead>
             <tbody>
               {selectedService.queue.map((person, index) => (
-                <tr key={person.ticket}>
+                <tr key={person.id}>
                   <td>{index + 1}</td><th scope="row">{person.ticket}</th><td>{person.name}</td>
-                  <td className={person.priority === 'High' ? 'priority-high' : 'admin-muted'}>{person.priority}</td>
+                  <td>
+                    <label className="sr-only" htmlFor={`priority-${person.id}`}>Priority for {person.name}</label>
+                    <select id={`priority-${person.id}`} value={person.priority} onChange={(event) => onUpdatePriority(person.id, event.target.value)}>
+                      {['High', 'Normal', 'Low'].map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+                    </select>
+                  </td>
                   <td>{person.waiting} min</td>
                   <td className="queue-actions">
-                    <button type="button" aria-label={`Move ${person.name} up`} disabled={index === 0} onClick={() => onMoveQueue(index, -1)}>Up</button>
-                    <button type="button" aria-label={`Move ${person.name} down`} disabled={index === selectedService.queue.length - 1} onClick={() => onMoveQueue(index, 1)}>Down</button>
-                    <button className="remove-action" type="button" onClick={() => onRemoveFromQueue(index)}>Remove</button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${person.name} up`}
+                      disabled={index === 0 || selectedService.queue[index - 1].priority !== person.priority}
+                      onClick={() => onMoveQueue(person.id, index)}
+                    >Up</button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${person.name} down`}
+                      disabled={index === selectedService.queue.length - 1 || selectedService.queue[index + 1].priority !== person.priority}
+                      onClick={() => onMoveQueue(person.id, index + 2)}
+                    >Down</button>
+                    <button className="remove-action" type="button" onClick={() => onRemoveFromQueue(person.id)}>Remove</button>
                   </td>
                 </tr>
               ))}
