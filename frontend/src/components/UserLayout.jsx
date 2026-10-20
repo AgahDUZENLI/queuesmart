@@ -1,5 +1,7 @@
 // Shared frame for the user pages: top nav (same look as the admin side),
 // then the page title and the page content.
+import { signOut } from '../api'
+
 const links = [
   { page: 'user-dashboard', label: 'Home' },
   { page: 'join-queue', label: 'Join a queue' },
@@ -31,7 +33,7 @@ function UserLayout({ title, subtitle, active, goTo, queue, children }) {
         </nav>
         <div className="nav-account">
           <span>Maya Robinson</span>
-          <button type="button" className="link-button" onClick={() => goTo('sign-in')}>
+          <button type="button" className="link-button" onClick={() => { signOut(); goTo('sign-in') }}>
             Sign out
           </button>
         </div>

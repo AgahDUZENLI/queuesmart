@@ -3,6 +3,7 @@ import AuthLayout from '../../components/AuthLayout'
 import TextInput from '../../components/TextInput'
 import Button from '../../components/Button'
 import { checkEmail, checkRequired, hasErrors } from '../../utils/validation'
+import { login, DEMO_ADMIN } from '../../api'
 
 function AdminSignIn({ goTo }) {
   const [email, setEmail] = useState('')
@@ -18,7 +19,16 @@ function AdminSignIn({ goTo }) {
     setErrors(newErrors)
     if (hasErrors(newErrors)) return
 
-    goTo('admin-overview')
+    signIn(email, password)
+  }
+
+  async function signIn(signInEmail, signInPassword) {
+    try {
+      await login(signInEmail, signInPassword, 'admin')
+      goTo('admin-overview')
+    } catch (error) {
+      setErrors({ ...error.fields, form: hasErrors(error.fields) ? '' : error.message })
+    }
   }
 
   return (
@@ -43,6 +53,7 @@ function AdminSignIn({ goTo }) {
           required
           error={errors.password}
         />
+        {errors.form && <p className="error" role="alert">{errors.form}</p>}
         <Button type="submit">Sign in</Button>
         <p>
           New here?{' '}
@@ -50,10 +61,10 @@ function AdminSignIn({ goTo }) {
             Create an admin account
           </button>
         </p>
-        {/* Demo shortcut: skips the form until the backend exists (A3) */}
+        {/* Demo shortcut: signs in with the demo account from backend/src/demo.js */}
         <p>
-          <button type="button" className="link-button" onClick={() => goTo('admin-overview')}>
-            Skip sign in (demo)
+          <button type="button" className="link-button" onClick={() => signIn(DEMO_ADMIN.email, DEMO_ADMIN.password)}>
+            Sign in as demo admin
           </button>
         </p>
       </form>
