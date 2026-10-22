@@ -12,11 +12,11 @@ Many organizations struggle with long queues and poor visibility into wait times
 
 **For Users**
 - Join a queue or book an appointment
-- View current position and estimated wait time
+- View current position and estimated wait time (learned from how long today's visits actually take)
 - Receive notifications as their turn approaches
 
 **For Administrators**
-- Create and manage services (name, duration, priority level)
+- Create and manage services (name, duration, priority level — High-priority services and longest-waiting queues are listed first)
 - Monitor active queues in real time
 - View usage statistics and queue history
 
@@ -34,10 +34,20 @@ This project is being built incrementally across a series of assignments:
 | Assignment | Focus | Status |
 |---|---|---|
 | [A1](./docs/assignment-1/A1.md) | Initial Thoughts & System Design | ✅ Complete |
-| [A2](./A2.md) | UI/UX Design | 🔲 Not started |
-| [A3](./A3.md) | API Design | 🔲 Not started |
-| [A4](./A4.md) | Data Design | 🔲 Not started |
+| [A2](./docs/assignment-2/A2_QueueSmart.docx) | UI/UX Design (React front end) | ✅ Complete |
+| [A3](./backend/README.md) | Back-End & API (Express, in-memory data, Jest tests) | 🚧 In progress |
+| A4 | Data Design & Persistence | 🔲 Not started |
 | Final | Full Implementation & Demo | 🔲 Not started |
+
+## Running It
+
+```bash
+docker compose up -d --build      # front end at http://localhost:5173, API at http://localhost:4000
+cd backend && npm install && npm test        # backend unit tests
+cd backend && npm run coverage               # coverage report in backend/coverage/
+```
+
+Demo accounts: `user@queuesmart.test` and `admin@queuesmart.test`, both with password `demo-pass-123`. The sign-in pages also have "Sign in as demo" buttons.
 
 ## Team
 

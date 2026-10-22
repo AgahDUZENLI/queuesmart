@@ -4,7 +4,7 @@
 
 const express = require('express')
 const { data, newId } = require('./data')
-const { queueSummary } = require('./queues')
+const { queueSummary, byServicePriority } = require('./queues')
 const { requireAuth, requireAdmin } = require('./auth')
 const { checkText, checkWholeNumber, checkOneOf, checkTime, checkTrueFalse, findErrors } = require('./validation')
 
@@ -76,11 +76,12 @@ function findOwnService(req, res) {
 
 const router = express.Router()
 
-// GET /api/services, or /api/services?placeId=1 for one place's services
+// GET /api/services, or /api/services?placeId=1 for one place's services.
+// High-priority services come first.
 router.get('/', (req, res) => {
   const placeId = Number(req.query.placeId)
-  const listed = req.query.placeId ? data.services.filter((s) => s.placeId === placeId) : data.services
-  const services = listed.map((service) => ({ ...service, ...queueSummary(service) }))
+  const listed = req.query.placeId ? data.services.filter((s) => s.placeId === placeId) : [...data.services]
+  const services = listed.sort(byServicePriority).map((service) => ({ ...service, ...queueSummary(service) }))
   res.json({ services })
 })
 
@@ -118,7 +119,10 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
 router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const service = findOwnService(req, res)
   if (!service) return
-  data.queueEntries = data.queueEntries.filter((entry) => entry.serviceId !== service.id)
+  // Keep the tickets so history survives; anyone still in line is removed from it
+  for (const entry of data.queueEntries) {
+    if (entry.serviceId === service.id && ['waiting', 'serving'].includes(entry.status)) entry.status = 'removed'
+  }
   data.services = data.services.filter((s) => s.id !== service.id)
   res.status(204).end()
 })

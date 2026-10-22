@@ -24,6 +24,15 @@ describe('register', () => {
     expect(res.body.token).toEqual(expect.any(String))
   })
 
+  test('stores a salted hash, never the plain password', async () => {
+    await register(ada)
+    await register({ ...ada, email: 'twin@example.edu' }) // same password
+    const [first, second] = data.users.map((user) => user.password)
+    expect(first).not.toContain(ada.password)
+    expect(first).toMatch(/^[0-9a-f]{32}:[0-9a-f]{128}$/)
+    expect(first).not.toBe(second) // different salt each time
+  })
+
   test('creates an admin and their place; the place id is a 6-digit join code', async () => {
     const res = await register(admin)
     const placeId = res.body.user.placeId
@@ -52,6 +61,10 @@ describe('register', () => {
   test('400 when an admin has no place name, or the role is unknown', async () => {
     expect((await register({ ...admin, placeName: '' })).body.fields).toEqual({ placeName: 'Place name is required.' })
     expect((await register({ ...ada, role: 'owner' })).body.fields).toEqual({ role: 'Role must be user or admin.' })
+  })
+
+  test('400 when emailMe is not true or false', async () => {
+    expect((await register({ ...ada, emailMe: 'yes' })).body.fields).toEqual({ emailMe: 'Email me must be true or false.' })
   })
 
   test('409 when the email is already registered', async () => {
@@ -88,6 +101,10 @@ describe('login', () => {
     expect((await login({ ...ada, role: 'admin' })).body.error).toBe('This is not an admin account.')
     expect((await login({ ...admin, role: 'user' })).body.error).toBe('This is not a user account.')
     expect((await login({ ...admin, role: 'admin' })).status).toBe(200)
+  })
+
+  test('400 for an unknown role', async () => {
+    expect((await login({ ...ada, role: 'owner' })).body.fields).toEqual({ role: 'Role must be user or admin.' })
   })
 })
 

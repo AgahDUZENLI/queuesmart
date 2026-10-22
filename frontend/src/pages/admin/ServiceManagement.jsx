@@ -58,6 +58,7 @@ function ServiceManagement({ services, selectedService, selectedServiceId, draft
                   </label>
                 ))}
               </div>
+              <p className="admin-muted">High-priority services are listed first; within a priority, the queue with the longest-waiting person comes first.</p>
             </fieldset>
             <div className="admin-field-grid">
               <label className="field admin-field"><span>Opens</span><input type="time" required value={draft.opens} onChange={(event) => onDraftChange('opens', event.target.value)} /></label>

@@ -53,7 +53,9 @@ router.post('/saved', requireAuth, (req, res) => {
 // DELETE /api/places/saved/:id - remove a place from the user's list
 router.delete('/saved/:id', requireAuth, (req, res) => {
   const user = data.users.find((u) => u.id === req.user.id)
-  if (user.savedPlaceIds) user.savedPlaceIds = user.savedPlaceIds.filter((id) => id !== Number(req.params.id))
+  const placeId = Number(req.params.id)
+  if (!(user.savedPlaceIds || []).includes(placeId)) return res.status(404).json({ error: 'That place is not in your list.' })
+  user.savedPlaceIds = user.savedPlaceIds.filter((id) => id !== placeId)
   res.status(204).end()
 })
 

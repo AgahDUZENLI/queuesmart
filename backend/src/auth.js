@@ -3,7 +3,18 @@
 const crypto = require('crypto')
 const express = require('express')
 const { data, newId } = require('./data')
-const { checkText, checkEmail, checkPassword, findErrors } = require('./validation')
+const { checkText, checkEmail, checkPassword, checkTrueFalse, findErrors } = require('./validation')
+
+// Passwords are stored as "salt:hash" using Node's built-in scrypt, never as plain text
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex')
+  return `${salt}:${crypto.scryptSync(password, salt, 64).toString('hex')}`
+}
+
+function passwordMatches(password, stored) {
+  const [salt, hash] = stored.split(':')
+  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), crypto.scryptSync(password, salt, 64))
+}
 
 // Never send the password back to the client
 function publicUser({ password, ...user }) {
@@ -29,7 +40,7 @@ function createUser({ role, firstName, lastName, email, password, placeName, ema
     firstName: firstName.trim(),
     lastName: lastName.trim(),
     email: email.trim().toLowerCase(),
-    password,
+    password: hashPassword(password),
     emailMe: emailMe !== false,
   }
   if (role === 'admin') user.placeId = createPlace(placeName).id
@@ -73,6 +84,7 @@ router.post('/register', (req, res) => {
     email: checkEmail(body.email),
     password: checkPassword(body.password),
     placeName: role === 'admin' ? checkText(body.placeName, 'Place name') : '',
+    emailMe: body.emailMe === undefined ? '' : checkTrueFalse(body.emailMe, 'Email me'),
   })
   if (errors) return res.status(400).json({ error: 'Validation failed.', fields: errors })
   if (findUserByEmail(body.email)) {
@@ -89,11 +101,12 @@ router.post('/login', (req, res) => {
   const errors = findErrors({
     email: checkEmail(body.email),
     password: checkText(body.password, 'Password', 64),
+    role: body.role === undefined || body.role === 'user' || body.role === 'admin' ? '' : 'Role must be user or admin.',
   })
   if (errors) return res.status(400).json({ error: 'Validation failed.', fields: errors })
 
   const user = findUserByEmail(body.email)
-  if (!user || user.password !== body.password) {
+  if (!user || !passwordMatches(body.password, user.password)) {
     return res.status(401).json({ error: 'Email or password is incorrect.' })
   }
   // The admin sign-in page sends role: 'admin' so regular users can't sign in there

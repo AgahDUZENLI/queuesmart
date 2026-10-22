@@ -8,6 +8,22 @@ const { checkOneOf, checkWholeNumber, findErrors } = require('./validation')
 const PRIORITIES = ['Low', 'Normal', 'High']
 const PRIORITY_ORDER = { High: 0, Normal: 1, Low: 2 }
 
+// Service priority decides which queues are listed first for staff and users:
+// High, then Normal, then Low. Within a priority, the queue whose first person has
+// waited longest comes first; queues with nobody waiting go last, by name.
+// (Ticket priority orders people inside a queue.)
+function byServicePriority(a, b) {
+  return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
+    || oldestJoinTime(a) - oldestJoinTime(b) // Infinity - Infinity is NaN, which falls through to the name
+    || a.name.localeCompare(b.name)
+}
+
+// When the longest-waiting person in this service's line joined, or Infinity if nobody is waiting
+function oldestJoinTime(service) {
+  const times = waitingTickets(service.id).map((entry) => Date.parse(entry.joinedAt))
+  return times.length > 0 ? Math.min(...times) : Infinity
+}
+
 function findService(id) {
   return data.services.find((service) => service.id === Number(id))
 }
@@ -22,8 +38,34 @@ function servingTicket(serviceId) {
   return data.queueEntries.find((entry) => entry.serviceId === Number(serviceId) && entry.status === 'serving') || null
 }
 
+// How many recent visits the wait estimate learns from
+const RECENT_VISITS = 5
+
+// True when an ISO timestamp falls on today's date (server time)
+function isToday(timestamp) {
+  return new Date(timestamp).toDateString() === new Date().toDateString()
+}
+
+// Only today's visits count, so every morning starts again from the set duration.
+function recentVisitMinutes(serviceId) {
+  return data.queueEntries
+    .filter((entry) => entry.serviceId === Number(serviceId) && entry.status === 'served' && entry.startedAt && entry.completedAt && isToday(entry.completedAt))
+    .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt) || b.id - a.id)
+    .slice(0, RECENT_VISITS)
+    .map((entry) => Math.max(0, Date.parse(entry.completedAt) - Date.parse(entry.startedAt)) / 60000)
+}
+
+// Minutes per person used for wait estimates: the average of today's last 5 served
+// visits. Until a service has 5 visits today, its expected duration fills the missing
+// ones, so a single very short or very long visit can't swing the estimate.
+function minutesPerPerson(service) {
+  const visits = recentVisitMinutes(service.id)
+  const filled = [...visits, ...Array(RECENT_VISITS - visits.length).fill(service.duration)]
+  return filled.reduce((sum, minutes) => sum + minutes, 0) / RECENT_VISITS
+}
+
 function estimateWaitMinutes(service, peopleAhead) {
-  return Math.ceil(service.duration * Math.max(0, peopleAhead))
+  return Math.ceil(Number((minutesPerPerson(service) * Math.max(0, peopleAhead)).toFixed(2)))
 }
 
 function queueSummary(service) {
@@ -32,6 +74,8 @@ function queueSummary(service) {
   return {
     waiting: waiting.length,
     wait: estimateWaitMinutes(service, waiting.length + (serving ? 1 : 0)),
+    averageDuration: Math.round(minutesPerPerson(service)), // learned minutes per visit
+    measuredVisits: recentVisitMinutes(service.id).length, // how many of today's visits that average uses (max 5)
   }
 }
 
@@ -134,6 +178,7 @@ router.get('/me', requireAuth, (req, res) => {
 router.get('/mine', requireAuth, requireAdmin, (req, res) => {
   const services = data.services
     .filter((service) => service.placeId === req.user.placeId)
+    .sort(byServicePriority)
     .map(adminQueueForService)
   const place = data.places.find((candidate) => candidate.id === req.user.placeId)
   res.json({ place, services })
@@ -161,6 +206,7 @@ router.post('/:serviceId/join', requireAuth, (req, res) => {
     placeId: service.placeId,
     userId: req.user.id,
     ticket: `${service.name[0].toUpperCase()}-${String(nextNumber).padStart(3, '0')}`,
+    serviceName: service.name, // kept for history if the service is deleted later
     priority: 'Normal',
     status: 'waiting',
     joinedAt: new Date().toISOString(),
@@ -268,4 +314,4 @@ router.post('/:serviceId/no-show', requireAuth, requireAdmin, (req, res) => {
   res.json({ ticket: publicTicket(current), service: adminQueueForService(service) })
 })
 
-module.exports = { router, estimateWaitMinutes, queueSummary, waitingTickets, servingTicket }
+module.exports = { router, byServicePriority, estimateWaitMinutes, minutesPerPerson, queueSummary, waitingTickets, servingTicket }

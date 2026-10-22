@@ -146,6 +146,49 @@ describe('list and get', () => {
   test('404 for an unknown id', async () => {
     expect((await request(app).get('/api/services/999')).status).toBe(404)
   })
+
+  test('service priority puts High services first, then Normal, then Low', async () => {
+    await createService({ ...advising, name: 'Career Coaching', priority: 'Low' })
+    await createService({ ...advising, name: 'Registrar', priority: 'Normal' })
+    await createService({ ...advising, name: 'Counseling', priority: 'High' })
+    await createService({ ...advising, name: 'Academic Advising', priority: 'Normal' })
+    const expected = ['Counseling', 'Academic Advising', 'Registrar', 'Career Coaching']
+
+    const list = await request(app).get(`/api/services?placeId=${data.places[0].id}`)
+    expect(list.body.services.map((s) => s.name)).toEqual(expected)
+    // Staff see their queues in the same order
+    const queues = await request(app).get('/api/queues/mine').set(adminAuth)
+    expect(queues.body.services.map((s) => s.name)).toEqual(expected)
+
+    // Raising a service's priority moves it up the list
+    const coaching = data.services.find((s) => s.name === 'Career Coaching')
+    await request(app).put(`/api/services/${coaching.id}`).set(adminAuth).send({ priority: 'High' })
+    const updated = await request(app).get(`/api/services?placeId=${data.places[0].id}`)
+    expect(updated.body.services.map((s) => s.name)).toEqual(['Career Coaching', 'Counseling', 'Academic Advising', 'Registrar'])
+  })
+
+  test('within a priority, the queue whose first person has waited longest comes first', async () => {
+    await createService({ ...advising, name: 'Academic Advising' })
+    await createService({ ...advising, name: 'Registrar' })
+    await createService({ ...advising, name: 'Financial Aid' })
+    await createService({ ...advising, name: 'Career Coaching', priority: 'Low' })
+    // Adds a waiting ticket to a service, joined `minutesAgo` minutes ago
+    const waitIn = (name, minutesAgo) => {
+      const service = data.services.find((s) => s.name === name)
+      data.queueEntries.push({
+        id: data.queueEntries.length + 1, serviceId: service.id, placeId: service.placeId, userId: 0, ticket: 'X-001',
+        priority: 'Normal', status: 'waiting', joinedAt: new Date(Date.now() - minutesAgo * 60000).toISOString(), queueOrder: 0,
+      })
+    }
+    waitIn('Academic Advising', 2)
+    waitIn('Registrar', 10)
+    waitIn('Registrar', 1)
+    waitIn('Career Coaching', 60) // waited longest, but Low priority stays below Normal
+
+    const list = await request(app).get(`/api/services?placeId=${data.places[0].id}`)
+    // Registrar (10 min) before Advising (2 min); Financial Aid has nobody waiting, so it goes last in its group
+    expect(list.body.services.map((s) => s.name)).toEqual(['Registrar', 'Academic Advising', 'Financial Aid', 'Career Coaching'])
+  })
 })
 
 describe('update', () => {
@@ -189,6 +232,30 @@ describe('delete', () => {
   test('403 for regular users', async () => {
     await createService(advising)
     expect((await request(app).delete(`/api/services/${firstId()}`).set(userAuth)).status).toBe(403)
+  })
+
+  test('keeps history: people in line are removed, finished visits stay with the service name', async () => {
+    await createService({ ...advising, status: 'Open' })
+    await createService({ ...advising, name: 'Registrar', status: 'Open' })
+    const id = firstId()
+    const other = await request(app).post('/api/auth/register').send({
+      firstName: 'Max', lastName: 'Other', email: 'other@example.edu', password: 'correct-horse',
+    })
+    const otherAuth = { Authorization: `Bearer ${other.body.token}` }
+
+    // Uma is served, Max is still waiting when the service is deleted
+    await request(app).post(`/api/queues/${id}/join`).set(userAuth)
+    await request(app).post(`/api/queues/${id}/next`).set(adminAuth)
+    await request(app).post(`/api/queues/${id}/complete`).set(adminAuth)
+    await request(app).post(`/api/queues/${id}/join`).set(otherAuth)
+    await request(app).delete(`/api/services/${id}`).set(adminAuth)
+
+    expect(data.queueEntries.map((entry) => entry.status)).toEqual(['served', 'removed'])
+    const history = await request(app).get('/api/history/me').set(userAuth)
+    expect(history.body.history[0]).toMatchObject({ serviceName: 'Academic Advising', status: 'served' })
+    // Max's ticket shows as removed, and Max can join another queue
+    expect((await request(app).get('/api/queues/me').set(otherAuth)).body.recent.status).toBe('removed')
+    expect((await request(app).post(`/api/queues/${data.services[0].id}/join`).set(otherAuth)).status).toBe(201)
   })
 })
 

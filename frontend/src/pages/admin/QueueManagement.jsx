@@ -60,6 +60,14 @@ function QueueManagement({ services, selectedService, showAllQueues, nowServing,
           ) : selectedService && (
             <p><AdminStatus status={selectedService.status} /> · {selectedService.waiting} waiting · new joiners wait about {selectedService.wait || 0} min</p>
           )}
+          {!showAllQueues && selectedService && (
+            <p className="admin-muted">
+              Visits take about {selectedService.averageDuration} min
+              {selectedService.measuredVisits > 0
+                ? ` (average of today's last ${selectedService.measuredVisits}, set to ${selectedService.duration})`
+                : ' (set duration; updates as people are served today)'}
+            </p>
+          )}
         </div>
         <div className="admin-heading-actions">
           <label className="sr-only" htmlFor="queue-service">Choose service</label>

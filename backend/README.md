@@ -35,7 +35,7 @@ Demo user logins (all use password `demo-pass-123`): `user@queuesmart.test`, `us
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | POST | `/api/auth/register` | `firstName`, `lastName`, `email`, `password`, `emailMe?`, `role?` (`user` or `admin`), `placeName` (admins only; creates their place) | `201 { user, token }` |
-| POST | `/api/auth/login` | `email`, `password`, `role?` | `200 { user, token }` |
+| POST | `/api/auth/login` | `email`, `password`, `role?` (`user` or `admin`) | `200 { user, token }` |
 | POST | `/api/auth/logout` | | `204` |
 | GET | `/api/auth/me` | | `200 { user }` |
 
@@ -48,12 +48,14 @@ Each admin runs one place, created when they register. A place's `id` is a rando
 | GET | `/api/places/code/:code` | anyone | | `200 { place, services }` |
 | GET | `/api/places/saved` | signed in | | `200 { places }` |
 | POST | `/api/places/saved` | user | `code` | `201 { place, services }` |
-| DELETE | `/api/places/saved/:id` | signed in | | `204` |
+| DELETE | `/api/places/saved/:id` | signed in | | `204`, or `404` if the place is not in the list |
 | GET | `/api/places/mine` | admin | | `200 { place, joinLink }` |
 
 ## Services API
 
 Each service belongs to the place of the admin who created it. Admins can only change services at their own place.
+
+**Two kinds of priority.** A service's `priority` decides which queues come first: `GET /api/services` and `GET /api/queues/mine` list High services, then Normal, then Low. Within the same priority, the queue whose first person has waited longest comes first (by join time); queues with nobody waiting go last in their group. Staff see the most urgent, longest-waiting queues at the top, and the order updates as people join and are served. A ticket's `priority` (set by an admin, see Queue API) decides who is served next inside one queue.
 
 | Method | Path | Who | Body | Returns |
 |---|---|---|---|---|
@@ -61,7 +63,7 @@ Each service belongs to the place of the admin who created it. Admins can only c
 | GET | `/api/services/:id` | anyone | | `200 { service }` |
 | POST | `/api/services` | admin | see fields below | `201 { service }` |
 | PUT | `/api/services/:id` | admin | only the fields that change | `200 { service }` |
-| DELETE | `/api/services/:id` | admin | | `204` |
+| DELETE | `/api/services/:id` | admin | | `204`. Past tickets are kept for history; anyone still in line is marked `removed` |
 
 | Field | Rule | Default |
 |---|---|---|
@@ -76,6 +78,8 @@ Each service belongs to the place of the admin who created it. Admins can only c
 
 Send the token as `Authorization: Bearer <token>`.
 
+Passwords are never stored as plain text: each one is hashed with Node's built-in `crypto.scrypt` and a random salt, stored as `salt:hash`, and checked with `crypto.timingSafeEqual` on login. Sessions are random tokens kept in memory, so they end when the server restarts. In A4 the hashes and sessions move into the database.
+
 Errors look like `{ "error": "Validation failed.", "fields": { "email": "Email is required." } }`. Status codes: 400 for invalid input, 401 when not signed in or the password is wrong, 403 for the wrong role, 409 when the email is taken.
 
 ## Queue API
@@ -84,7 +88,25 @@ Users join an open service with `POST /api/queues/:serviceId/join`, view their a
 
 Admins can view queues at their place with `GET /api/queues/mine`, call the next person with `POST /api/queues/:serviceId/next`, complete the current ticket with `POST /api/queues/:serviceId/complete`, and mark a no-show with `POST /api/queues/:serviceId/no-show`. Waiting tickets can be reprioritized or reordered within their priority group with `PATCH /api/queues/:serviceId/tickets/:ticketId`, using `{ "priority": "High" }` or `{ "position": 1 }`. New tickets default to `Normal`; equal-priority tickets are served in arrival order.
 
-Wait estimates use the simple rule `people ahead × service duration`. The estimate for a new arrival includes the currently serving ticket, if any. Estimates and queue counts are also included in `GET /api/services?placeId=...`.
+Wait estimates use the rule `people ahead × minutes per person`. Minutes per person starts each day as the service's `duration` and learns from real visits: it is the average of today's last 5 served visits (time from "Call next" to "Done"), with the set `duration` filling in until 5 visits exist today. Visits from earlier days are ignored, so every morning starts again from the admin's number. No-shows and people who left are not measured.
+
+| Today's served visits (set duration 15) | Minutes per person |
+|---|---|
+| none | 15 |
+| one visit of 5 min | (5 + 15 + 15 + 15 + 15) / 5 = 13 |
+| five or more | average of the last 5 real visits only | The estimate for a new arrival includes the currently serving ticket, if any. Estimates, queue counts, `averageDuration` and `measuredVisits` are also included in `GET /api/services?placeId=...` and `GET /api/queues/mine`.
+
+## History API
+
+History is built from the same queue tickets, so nothing extra is stored. Each item has `ticket`, `status`, `serviceName`, `placeName`, `name`, `joinedAt`, `startedAt`, `completedAt` and `waitedMinutes`. Newest first.
+
+| Method | Path | Who | Query | Returns | Shown on |
+|---|---|---|---|---|---|
+| GET | `/api/history/me` | user | `status?`, `limit?` (1–100, default 50) | `200 { total, history }` | user History page |
+| GET | `/api/history` | admin | `status?`, `limit?` | `200 { total, history }` for the admin's place | admin History tab |
+| GET | `/api/history/stats` | admin | | `200 { total, waiting, serving, served, left, removed, noShow, averageWaitMinutes }` | admin History tab |
+
+`status` must be one of `waiting`, `serving`, `served`, `left`, `removed`, `no-show`; anything else returns 400.
 
 ## Adding a module
 

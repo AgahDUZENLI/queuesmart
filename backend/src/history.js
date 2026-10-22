@@ -28,7 +28,7 @@ function historyItem(entry) {
     startedAt: entry.startedAt || null,
     completedAt: entry.completedAt || null,
     waitedMinutes: minutesBetween(entry.joinedAt, entry.startedAt),
-    serviceName: service ? service.name : 'Removed service',
+    serviceName: service ? service.name : entry.serviceName || 'Removed service',
     placeName: place ? place.name : null,
     name: user ? `${user.firstName} ${user.lastName}` : 'Guest',
   }
