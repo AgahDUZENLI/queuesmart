@@ -1,10 +1,19 @@
 import { useEffect, useState } from 'react'
-import { initialTicket, initialHistory, initialNotifications } from '../data/userQueue'
+import { initialTicket, initialNotifications } from "../data/userQueue";
 import * as api from '../api'
 import { ordinal } from '../utils/queueRules'
 
-function today() {
-  return new Date().toLocaleDateString('en-CA') // local date as YYYY-MM-DD
+// How each finished ticket status is shown in the History table
+const OUTCOMES = { served: 'Served', left: 'Left queue', 'no-show': 'No-show', removed: 'Removed by staff' }
+
+// Turns a ticket from GET /api/history/me into a row for the History table
+function toHistoryRow(item) {
+  return {
+    Date: new Date(item.joinedAt).toLocaleDateString('en-CA'), // local date as YYYY-MM-DD
+    Place: item.placeName || '',
+    Service: item.serviceName,
+    Outcome: OUTCOMES[item.status] || item.status,
+  }
 }
 
 function timeNow() {
@@ -29,12 +38,22 @@ function useUserQueue() {
   const [ticket, setTicket] = useState(initialTicket)
   const [lastOutcome, setLastOutcome] = useState('')
   const [queueError, setQueueError] = useState('')
-  const [history, setHistory] = useState(initialHistory)
+  const [history, setHistory] = useState([]);
   const [notifications, setNotifications] = useState(initialNotifications)
   const [pickedPlaceId, setPickedPlaceId] = useState('') // place chosen on Home before opening Join a queue
   const activeTicketId = ticket?.id
   const service = ticket ? services.find((s) => s.id === ticket.serviceId) : null
   const place = service ? places.find((p) => p.id === service.placeId) : null
+
+    // Loads the user's past queues from the backend (tickets still waiting or being served are not history yet)
+  async function loadHistory() {
+    try {
+      const result = await api.getMyHistory()
+      setHistory(result.history.filter((item) => !['waiting', 'serving'].includes(item.status)).map(toHistoryRow))
+    } catch {
+      // keep what is already on screen if the history cannot be loaded
+    }
+  }
 
   // Loads the user's places and their services from the backend
   async function loadPlaces() {
@@ -46,6 +65,7 @@ function useUserQueue() {
     setQueueError('')
     setTicket(toTicket(current.ticket))
     setLastOutcome(current.ticket ? '' : current.recent?.status || '')
+    await loadHistory()
   }
 
   // Adds a place by its join code. Returns true when it worked.
@@ -66,10 +86,6 @@ function useUserQueue() {
     await api.removePlace(placeId)
     if (pickedPlaceId === placeId) setPickedPlaceId('')
     await loadPlaces()
-  }
-
-  function addToHistory(outcome) {
-    setHistory((current) => [{ Date: today(), Place: place.name, Service: service.name, Outcome: outcome }, ...current])
   }
 
   // type: 'Queue update' or 'Status change'
@@ -103,7 +119,7 @@ function useUserQueue() {
       setQueueError(error.message)
       throw error
     }
-    addToHistory('Left queue')
+    loadHistory()
     notify('Queue update', `You left the queue for ${service.name}.`)
     setTicket(null)
     setLastOutcome('left')
@@ -129,6 +145,7 @@ function useUserQueue() {
         } else {
           setTicket(null)
           setLastOutcome(result.recent?.status || 'inactive')
+          loadHistory()
           if (result.recent?.status === 'served') notify('Status change', `You have been served at ${result.recent.service?.name || 'the service'}.`)
           else if (result.recent?.status === 'no-show') notify('Status change', 'Your ticket was marked as a no-show.')
           else if (result.recent?.status === 'removed') notify('Status change', 'Your ticket was removed from the queue.')
