@@ -199,6 +199,24 @@ describe('administrator queue management', () => {
     })
   })
 
+  test('admins can mark the person being served as a no-show', async () => {
+    const first = (await join()).body.ticket
+    await join(otherUserAuth)
+    const noShow = () => request(app).post(`/api/queues/${serviceId()}/no-show`).set(adminAuth)
+
+    expect((await noShow()).status).toBe(409) // nobody is being served yet
+    await request(app).post(`/api/queues/${serviceId()}/next`).set(adminAuth)
+    const res = await noShow()
+    expect(res.status).toBe(200)
+    expect(res.body.ticket).toMatchObject({ id: first.id, status: 'no-show' })
+    expect(res.body.service.nowServing).toBeNull()
+
+    // The user sees the outcome, the next person can be called, and users cannot do this
+    expect((await request(app).get('/api/queues/me').set(userAuth)).body.recent.status).toBe('no-show')
+    expect((await request(app).post(`/api/queues/${serviceId()}/next`).set(adminAuth)).status).toBe(200)
+    expect((await request(app).post(`/api/queues/${serviceId()}/no-show`).set(userAuth)).status).toBe(403)
+  })
+
   test('admins can remove a ticket and cannot manage another place', async () => {
     const ticket = (await join()).body.ticket
     expect((await request(app).delete(`/api/queues/tickets/${ticket.id}`).set(adminAuth)).status).toBe(204)

@@ -1,4 +1,4 @@
-// In memory data (no database until A4)
+// In-memory data (no database until A4). Restarting the server resets it.
 
 const crypto = require('crypto')
 
@@ -10,7 +10,8 @@ const data = {
   queueEntries: [],
 }
 
-// A random, unused 6-digit id, e.g. 482913. 
+// A random, unused 6-digit id, e.g. 482913. Used for users, places, services and
+// tickets, and can become the primary key when a database is added in A4.
 function newId(list) {
   let id
   do {
