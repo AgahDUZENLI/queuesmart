@@ -1,6 +1,7 @@
 const request = require('supertest')
 const { createApp } = require('../src/app')
 const { data, reset } = require('../src/data')
+const { estimateWaitMinutes, minutesPerPerson, queueSummary } = require('../src/queues')
 
 const serviceBody = {
   name: 'Academic Advising',
@@ -215,5 +216,79 @@ describe('administrator queue management', () => {
       .send({ ...serviceBody, name: 'Different service' })
     const otherServiceId = response.body.service.id
     expect((await request(app).post(`/api/queues/${otherServiceId}/next`).set(adminAuth)).status).toBe(403)
+  })
+})
+
+describe('learning visit length from real visits', () => {
+  // Adds a finished visit that took `minutes`. It ends at noon `daysAgo` days ago,
+  // plus `order` minutes, so tests never cross midnight.
+  function addServedVisit(minutes, { status = 'served', daysAgo = 0, order = 0 } = {}) {
+    const noon = new Date()
+    noon.setHours(12, 0, 0, 0)
+    noon.setDate(noon.getDate() - daysAgo)
+    const end = noon.getTime() + order * 60000
+    data.queueEntries.push({
+      id: data.queueEntries.length + 1,
+      serviceId: serviceId(),
+      placeId: data.places[0].id,
+      userId: 0,
+      ticket: 'X-000',
+      priority: 'Normal',
+      status,
+      joinedAt: new Date(end - (minutes + 5) * 60000).toISOString(),
+      startedAt: new Date(end - minutes * 60000).toISOString(),
+      completedAt: new Date(end).toISOString(),
+      queueOrder: 0,
+    })
+  }
+
+  test('uses the expected duration until real visits are measured', () => {
+    expect(minutesPerPerson(data.services[0])).toBe(15)
+    expect(queueSummary(data.services[0])).toMatchObject({ averageDuration: 15, measuredVisits: 0 })
+  })
+
+  test('averages real visits, filling missing ones with the expected duration', () => {
+    addServedVisit(5)
+    addServedVisit(5)
+    // (5 + 5 + 15 + 15 + 15) / 5 = 11
+    expect(minutesPerPerson(data.services[0])).toBe(11)
+    expect(estimateWaitMinutes(data.services[0], 3)).toBe(33)
+  })
+
+  test('only the 5 most recent visits count', () => {
+    addServedVisit(60, { order: -120 })
+    for (let i = 0; i < 5; i += 1) addServedVisit(4, { order: i })
+    expect(minutesPerPerson(data.services[0])).toBe(4)
+    expect(queueSummary(data.services[0]).measuredVisits).toBe(5)
+  })
+
+  test('starts each day again from the set duration', () => {
+    for (let i = 0; i < 5; i += 1) addServedVisit(4, { daysAgo: 1, order: i })
+    expect(minutesPerPerson(data.services[0])).toBe(15)
+    expect(queueSummary(data.services[0]).measuredVisits).toBe(0)
+
+    addServedVisit(5)
+    // Yesterday's visits are ignored: (5 + 15 * 4) / 5 = 13
+    expect(minutesPerPerson(data.services[0])).toBe(13)
+  })
+
+  test('no-shows and people who left are not measured', () => {
+    addServedVisit(2, { status: 'no-show' })
+    addServedVisit(2, { status: 'left' })
+    expect(minutesPerPerson(data.services[0])).toBe(15)
+  })
+
+  test('completing a ticket updates the estimate for everyone still waiting', async () => {
+    await join()
+    await join(otherUserAuth)
+    await request(app).post(`/api/queues/${serviceId()}/next`).set(adminAuth)
+    // Pretend the first visit started 5 minutes ago
+    data.queueEntries.find((entry) => entry.status === 'serving').startedAt = new Date(Date.now() - 5 * 60000).toISOString()
+    await request(app).post(`/api/queues/${serviceId()}/complete`).set(adminAuth)
+
+    // (5 + 15 * 4) / 5 = 13 minutes per person, 1 person waiting
+    const res = await request(app).get('/api/queues/mine').set(adminAuth)
+    expect(res.body.services[0]).toMatchObject({ waiting: 1, wait: 13, averageDuration: 13, measuredVisits: 1 })
+    expect((await request(app).get('/api/queues/me').set(otherUserAuth)).body.ticket.peopleAhead).toBe(0)
   })
 })

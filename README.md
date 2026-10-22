@@ -12,7 +12,7 @@ Many organizations struggle with long queues and poor visibility into wait times
 
 **For Users**
 - Join a queue or book an appointment
-- View current position and estimated wait time
+- View current position and estimated wait time (learned from how long today's visits actually take)
 - Receive notifications as their turn approaches
 
 **For Administrators**

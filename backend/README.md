@@ -82,7 +82,13 @@ Users join an open service with `POST /api/queues/:serviceId/join`, view their a
 
 Admins can view queues at their place with `GET /api/queues/mine`, call the next person with `POST /api/queues/:serviceId/next`, complete the current ticket with `POST /api/queues/:serviceId/complete`, and mark a no-show with `POST /api/queues/:serviceId/no-show`. Waiting tickets can be reprioritized or reordered within their priority group with `PATCH /api/queues/:serviceId/tickets/:ticketId`, using `{ "priority": "High" }` or `{ "position": 1 }`. New tickets default to `Normal`; equal-priority tickets are served in arrival order.
 
-Wait estimates use the simple rule `people ahead × service duration`. The estimate for a new arrival includes the currently serving ticket, if any. Estimates and queue counts are also included in `GET /api/services?placeId=...`.
+Wait estimates use the rule `people ahead × minutes per person`. Minutes per person starts each day as the service's `duration` and learns from real visits: it is the average of today's last 5 served visits (time from "Call next" to "Done"), with the set `duration` filling in until 5 visits exist today. Visits from earlier days are ignored, so every morning starts again from the admin's number. No-shows and people who left are not measured.
+
+| Today's served visits (set duration 15) | Minutes per person |
+|---|---|
+| none | 15 |
+| one visit of 5 min | (5 + 15 + 15 + 15 + 15) / 5 = 13 |
+| five or more | average of the last 5 real visits only | The estimate for a new arrival includes the currently serving ticket, if any. Estimates, queue counts, `averageDuration` and `measuredVisits` are also included in `GET /api/services?placeId=...` and `GET /api/queues/mine`.
 
 ## Adding a module
 

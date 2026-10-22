@@ -22,8 +22,34 @@ function servingTicket(serviceId) {
   return data.queueEntries.find((entry) => entry.serviceId === Number(serviceId) && entry.status === 'serving') || null
 }
 
+// How many recent visits the wait estimate learns from
+const RECENT_VISITS = 5
+
+// True when an ISO timestamp falls on today's date (server time)
+function isToday(timestamp) {
+  return new Date(timestamp).toDateString() === new Date().toDateString()
+}
+
+// Only today's visits count, so every morning starts again from the set duration.
+function recentVisitMinutes(serviceId) {
+  return data.queueEntries
+    .filter((entry) => entry.serviceId === Number(serviceId) && entry.status === 'served' && entry.startedAt && entry.completedAt && isToday(entry.completedAt))
+    .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt) || b.id - a.id)
+    .slice(0, RECENT_VISITS)
+    .map((entry) => Math.max(0, Date.parse(entry.completedAt) - Date.parse(entry.startedAt)) / 60000)
+}
+
+// Minutes per person used for wait estimates: the average of today's last 5 served
+// visits. Until a service has 5 visits today, its expected duration fills the missing
+// ones, so a single very short or very long visit can't swing the estimate.
+function minutesPerPerson(service) {
+  const visits = recentVisitMinutes(service.id)
+  const filled = [...visits, ...Array(RECENT_VISITS - visits.length).fill(service.duration)]
+  return filled.reduce((sum, minutes) => sum + minutes, 0) / RECENT_VISITS
+}
+
 function estimateWaitMinutes(service, peopleAhead) {
-  return Math.ceil(service.duration * Math.max(0, peopleAhead))
+  return Math.ceil(Number((minutesPerPerson(service) * Math.max(0, peopleAhead)).toFixed(2)))
 }
 
 function queueSummary(service) {
@@ -32,6 +58,8 @@ function queueSummary(service) {
   return {
     waiting: waiting.length,
     wait: estimateWaitMinutes(service, waiting.length + (serving ? 1 : 0)),
+    averageDuration: Math.round(minutesPerPerson(service)), // learned minutes per visit
+    measuredVisits: recentVisitMinutes(service.id).length, // how many of today's visits that average uses (max 5)
   }
 }
 
@@ -268,4 +296,4 @@ router.post('/:serviceId/no-show', requireAuth, requireAdmin, (req, res) => {
   res.json({ ticket: publicTicket(current), service: adminQueueForService(service) })
 })
 
-module.exports = { router, estimateWaitMinutes, queueSummary, waitingTickets, servingTicket }
+module.exports = { router, estimateWaitMinutes, minutesPerPerson, queueSummary, waitingTickets, servingTicket }

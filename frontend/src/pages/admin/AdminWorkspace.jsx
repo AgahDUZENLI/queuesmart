@@ -165,7 +165,7 @@ function AdminWorkspace({ goTo, initialPage = 'overview' }) {
     : 0
   const currentlyServing = services.filter((service) => service.nowServing).length
   const averageDuration = services.length
-    ? Math.round(services.reduce((total, service) => total + service.duration, 0) / services.length)
+    ? Math.round(services.reduce((total, service) => total + service.averageDuration, 0) / services.length)
     : 0
 
   return (
