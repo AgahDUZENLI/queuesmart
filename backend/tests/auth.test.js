@@ -24,6 +24,15 @@ describe('register', () => {
     expect(res.body.token).toEqual(expect.any(String))
   })
 
+  test('stores a salted hash, never the plain password', async () => {
+    await register(ada)
+    await register({ ...ada, email: 'twin@example.edu' }) // same password
+    const [first, second] = data.users.map((user) => user.password)
+    expect(first).not.toContain(ada.password)
+    expect(first).toMatch(/^[0-9a-f]{32}:[0-9a-f]{128}$/)
+    expect(first).not.toBe(second) // different salt each time
+  })
+
   test('creates an admin and their place; the place id is a 6-digit join code', async () => {
     const res = await register(admin)
     const placeId = res.body.user.placeId

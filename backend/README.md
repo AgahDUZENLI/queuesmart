@@ -76,6 +76,8 @@ Each service belongs to the place of the admin who created it. Admins can only c
 
 Send the token as `Authorization: Bearer <token>`.
 
+Passwords are never stored as plain text: each one is hashed with Node's built-in `crypto.scrypt` and a random salt, stored as `salt:hash`, and checked with `crypto.timingSafeEqual` on login. Sessions are random tokens kept in memory, so they end when the server restarts. In A4 the hashes and sessions move into the database.
+
 Errors look like `{ "error": "Validation failed.", "fields": { "email": "Email is required." } }`. Status codes: 400 for invalid input, 401 when not signed in or the password is wrong, 403 for the wrong role, 409 when the email is taken.
 
 ## Queue API
