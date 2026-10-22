@@ -25,6 +25,7 @@ function AdminWorkspace({ goTo, initialPage = 'overview' }) {
   const [activePage, setActivePage] = useState(initialPage)
   const [services, setServices] = useState([])
   const [selectedServiceId, setSelectedServiceId] = useState(null)
+  const [showAllQueues, setShowAllQueues] = useState(true)
   const [draft, setDraft] = useState({ ...emptyService })
   const [editing, setEditing] = useState(false)
   const [placeName, setPlaceName] = useState('')
@@ -204,7 +205,7 @@ function AdminWorkspace({ goTo, initialPage = 'overview' }) {
                 currentlyServing={currentlyServing}
                 averageDuration={averageDuration}
                 onCreate={createService}
-                onManage={(serviceId) => { setSelectedServiceId(serviceId); navigateTo('queues') }}
+                onManage={(serviceId) => { setSelectedServiceId(serviceId); setShowAllQueues(false); navigateTo('queues') }}
                 onToggleStatus={(service) => updateService(service.id, { status: service.status === 'Open' ? 'Paused' : 'Open' })}
               />
             )}
@@ -212,8 +213,12 @@ function AdminWorkspace({ goTo, initialPage = 'overview' }) {
               <QueueManagement
                 services={services}
                 selectedService={selectedService}
+                showAllQueues={showAllQueues}
                 nowServing={selectedService?.nowServing}
-                onSelectService={(serviceId) => setSelectedServiceId(Number(serviceId))}
+                onSelectService={(serviceId) => {
+                  setShowAllQueues(serviceId === 'all')
+                  if (serviceId !== 'all') setSelectedServiceId(Number(serviceId))
+                }}
                 onUpdateService={updateService}
                 onServeNext={() => runQueueAction(() => api.serveNext(selectedService.id))}
                 onComplete={() => runQueueAction(() => api.completeServing(selectedService.id))}

@@ -3,7 +3,7 @@ import AuthLayout from '../../components/AuthLayout'
 import TextInput from '../../components/TextInput'
 import Button from '../../components/Button'
 import { checkEmail, checkRequired, hasErrors } from '../../utils/validation'
-import { login, DEMO_USER } from '../../api'
+import { login, DEMO_USERS } from '../../api'
 
 function SignIn({ goTo, onSignedIn, joinCode }) {
   const [email, setEmail] = useState('')
@@ -62,12 +62,15 @@ function SignIn({ goTo, onSignedIn, joinCode }) {
             Create one
           </button>
         </p>
-        {/* Demo shortcut: signs in with the demo account from backend/src/demo.js */}
-        <p>
-          <button type="button" className="link-button" onClick={() => signIn(DEMO_USER.email, DEMO_USER.password)}>
-            Sign in as demo user
-          </button>
-        </p>
+        <div className="demo-logins">
+          {DEMO_USERS.map((account, index) => (
+            <p key={account.email}>
+              <button type="button" className="link-button" onClick={() => signIn(account.email, account.password)}>
+                {index === 0 ? 'Sign in as demo user' : `Sign in as demo user ${index + 1}`}
+              </button>
+            </p>
+          ))}
+        </div>
       </form>
     </AuthLayout>
   )

@@ -27,7 +27,12 @@ async function request(method, path, body) {
 }
 
 // Demo accounts loaded by backend/src/demo.js
-export const DEMO_USER = { email: 'user@queuesmart.test', password: 'demo-pass-123' }
+export const DEMO_USERS = [
+  { email: 'user@queuesmart.test', password: 'demo-pass-123' },
+  { email: 'user2@queuesmart.test', password: 'demo-pass-123' },
+  { email: 'user3@queuesmart.test', password: 'demo-pass-123' },
+  { email: 'user4@queuesmart.test', password: 'demo-pass-123' },
+]
 export const DEMO_ADMIN = { email: 'admin@queuesmart.test', password: 'demo-pass-123' }
 
 export async function login(email, password, role) {

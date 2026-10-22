@@ -14,6 +14,8 @@ Or run everything from the repo root with `docker compose up -d`.
 
 Demo accounts, places and services are loaded on startup from `src/demo.js`. Demo join codes: `123456` (Student Services Center), `234567` (Main Street Tire Shop), `345678` (Eastside Health Clinic).
 
+Demo user logins (all use password `demo-pass-123`): `user@queuesmart.test`, `user2@queuesmart.test`, `user3@queuesmart.test`, and `user4@queuesmart.test`. Each demo user has the Student Services Center saved.
+
 ## Files
 
 | File | What it does |

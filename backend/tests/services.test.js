@@ -259,13 +259,30 @@ describe('delete', () => {
   })
 })
 
-test('demo data has valid accounts and the six sample services', async () => {
+test('demo data has four user logins and the six sample services', async () => {
   reset()
   loadDemoData()
   expect(data.places.map((p) => p.id)).toEqual([123456, 234567, 345678])
-  expect(data.users.find((u) => u.role === 'user').savedPlaceIds).toEqual([123456])
+  const demoUsers = data.users.filter((user) => user.role === 'user')
+  expect(demoUsers.map((user) => user.email)).toEqual([
+    'user@queuesmart.test',
+    'user2@queuesmart.test',
+    'user3@queuesmart.test',
+    'user4@queuesmart.test',
+  ])
+  expect(demoUsers.every((user) => user.savedPlaceIds.includes(123456))).toBe(true)
   expect(data.services.every((s) => s.placeId === 123456)).toBe(true)
   expect(data.services.map((s) => s.name)).toEqual([
     'Academic Advising', 'Financial Aid', 'Registrar', 'Counseling Intake', 'IT Help Desk', 'Career Coaching',
   ])
+
+  for (const user of demoUsers) {
+    const res = await request(app).post('/api/auth/login').send({
+      email: user.email,
+      password: 'demo-pass-123',
+      role: 'user',
+    })
+    expect(res.status).toBe(200)
+    expect(res.body.user.email).toBe(user.email)
+  }
 })
