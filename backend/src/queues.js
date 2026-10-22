@@ -9,12 +9,10 @@ const PRIORITIES = ['Low', 'Normal', 'High']
 const PRIORITY_ORDER = { High: 0, Normal: 1, Low: 2 }
 
 // Service priority decides which queues are listed first for staff and users:
-// High, then Normal, then Low. Within a priority, the queue whose first person has
 // waited longest comes first; queues with nobody waiting go last, by name.
-// (Ticket priority orders people inside a queue.)
 function byServicePriority(a, b) {
   return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
-    || oldestJoinTime(a) - oldestJoinTime(b) // Infinity - Infinity is NaN, which falls through to the name
+    || oldestJoinTime(a) - oldestJoinTime(b)
     || a.name.localeCompare(b.name)
 }
 

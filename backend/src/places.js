@@ -2,8 +2,7 @@
 //
 // A place's id is a 6-digit number that doubles as its join code. Users add a
 // place to "My places" by typing the code or scanning the place's QR code.
-// The QR code is just a link to the front end with the code in it,
-// e.g. http://localhost:5173/?code=482913
+// The QR code is just a link to the front end with the code in it
 
 const express = require('express')
 const { data } = require('./data')

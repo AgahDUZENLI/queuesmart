@@ -12,7 +12,7 @@ function createApp() {
 
   app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
 
-  // Each module mounts its routes here
+
   app.use('/api/auth', auth.router)
   app.use('/api/places', places.router)
   app.use('/api/services', services.router)
@@ -21,7 +21,6 @@ function createApp() {
   app.use((req, res) => res.status(404).json({ error: 'Not found.' }))
 
   // Bad JSON bodies (status 400) and unexpected errors (500)
-  // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
     const status = err.status || 500
     res.status(status).json({ error: status === 500 ? 'Something went wrong.' : 'Request body must be valid JSON.' })

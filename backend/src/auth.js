@@ -26,7 +26,7 @@ function findUserByEmail(email) {
 }
 
 // Every admin runs one place. It is created when they register.
-// The place's id is also the join code people type, or scan as a QR code.
+// The place's id or scan QR code.
 function createPlace(name) {
   const place = { id: newId(data.places), name: name.trim() }
   data.places.push(place)
