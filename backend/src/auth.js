@@ -3,7 +3,7 @@
 const crypto = require('crypto')
 const express = require('express')
 const { data, newId } = require('./data')
-const { checkText, checkEmail, checkPassword, findErrors } = require('./validation')
+const { checkText, checkEmail, checkPassword, checkTrueFalse, findErrors } = require('./validation')
 
 // Never send the password back to the client
 function publicUser({ password, ...user }) {
@@ -73,6 +73,7 @@ router.post('/register', (req, res) => {
     email: checkEmail(body.email),
     password: checkPassword(body.password),
     placeName: role === 'admin' ? checkText(body.placeName, 'Place name') : '',
+    emailMe: body.emailMe === undefined ? '' : checkTrueFalse(body.emailMe, 'Email me'),
   })
   if (errors) return res.status(400).json({ error: 'Validation failed.', fields: errors })
   if (findUserByEmail(body.email)) {
@@ -89,6 +90,7 @@ router.post('/login', (req, res) => {
   const errors = findErrors({
     email: checkEmail(body.email),
     password: checkText(body.password, 'Password', 64),
+    role: body.role === undefined || body.role === 'user' || body.role === 'admin' ? '' : 'Role must be user or admin.',
   })
   if (errors) return res.status(400).json({ error: 'Validation failed.', fields: errors })
 

@@ -54,6 +54,10 @@ describe('register', () => {
     expect((await register({ ...ada, role: 'owner' })).body.fields).toEqual({ role: 'Role must be user or admin.' })
   })
 
+  test('400 when emailMe is not true or false', async () => {
+    expect((await register({ ...ada, emailMe: 'yes' })).body.fields).toEqual({ emailMe: 'Email me must be true or false.' })
+  })
+
   test('409 when the email is already registered', async () => {
     await register(ada)
     const res = await register({ ...ada, email: 'ADA@example.edu' })
@@ -88,6 +92,10 @@ describe('login', () => {
     expect((await login({ ...ada, role: 'admin' })).body.error).toBe('This is not an admin account.')
     expect((await login({ ...admin, role: 'user' })).body.error).toBe('This is not a user account.')
     expect((await login({ ...admin, role: 'admin' })).status).toBe(200)
+  })
+
+  test('400 for an unknown role', async () => {
+    expect((await login({ ...ada, role: 'owner' })).body.fields).toEqual({ role: 'Role must be user or admin.' })
   })
 })
 

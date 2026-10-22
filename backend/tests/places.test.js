@@ -74,6 +74,8 @@ describe('my places', () => {
     await addPlace({ code })
     expect((await request(app).delete(`/api/places/saved/${code}`).set(userAuth)).status).toBe(204)
     expect((await request(app).get('/api/places/saved').set(userAuth)).body.places).toEqual([])
+    // Removing it again, or a place that was never added, is a 404
+    expect((await request(app).delete(`/api/places/saved/${code}`).set(userAuth)).status).toBe(404)
   })
 
   test('400 for a missing or invalid code, 404 for an unknown one', async () => {
@@ -91,7 +93,7 @@ describe('my places', () => {
 
   test('admins have no saved places', async () => {
     expect((await request(app).get('/api/places/saved').set(adminAuth)).body.places).toEqual([])
-    expect((await request(app).delete('/api/places/saved/1').set(adminAuth)).status).toBe(204)
+    expect((await request(app).delete('/api/places/saved/1').set(adminAuth)).status).toBe(404)
   })
 })
 

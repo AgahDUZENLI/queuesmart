@@ -33,7 +33,7 @@ Demo accounts, places and services are loaded on startup from `src/demo.js`. Dem
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | POST | `/api/auth/register` | `firstName`, `lastName`, `email`, `password`, `emailMe?`, `role?` (`user` or `admin`), `placeName` (admins only; creates their place) | `201 { user, token }` |
-| POST | `/api/auth/login` | `email`, `password`, `role?` | `200 { user, token }` |
+| POST | `/api/auth/login` | `email`, `password`, `role?` (`user` or `admin`) | `200 { user, token }` |
 | POST | `/api/auth/logout` | | `204` |
 | GET | `/api/auth/me` | | `200 { user }` |
 
@@ -46,7 +46,7 @@ Each admin runs one place, created when they register. A place's `id` is a rando
 | GET | `/api/places/code/:code` | anyone | | `200 { place, services }` |
 | GET | `/api/places/saved` | signed in | | `200 { places }` |
 | POST | `/api/places/saved` | user | `code` | `201 { place, services }` |
-| DELETE | `/api/places/saved/:id` | signed in | | `204` |
+| DELETE | `/api/places/saved/:id` | signed in | | `204`, or `404` if the place is not in the list |
 | GET | `/api/places/mine` | admin | | `200 { place, joinLink }` |
 
 ## Services API
