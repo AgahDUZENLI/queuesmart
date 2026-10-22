@@ -146,6 +146,49 @@ describe('list and get', () => {
   test('404 for an unknown id', async () => {
     expect((await request(app).get('/api/services/999')).status).toBe(404)
   })
+
+  test('service priority puts High services first, then Normal, then Low', async () => {
+    await createService({ ...advising, name: 'Career Coaching', priority: 'Low' })
+    await createService({ ...advising, name: 'Registrar', priority: 'Normal' })
+    await createService({ ...advising, name: 'Counseling', priority: 'High' })
+    await createService({ ...advising, name: 'Academic Advising', priority: 'Normal' })
+    const expected = ['Counseling', 'Academic Advising', 'Registrar', 'Career Coaching']
+
+    const list = await request(app).get(`/api/services?placeId=${data.places[0].id}`)
+    expect(list.body.services.map((s) => s.name)).toEqual(expected)
+    // Staff see their queues in the same order
+    const queues = await request(app).get('/api/queues/mine').set(adminAuth)
+    expect(queues.body.services.map((s) => s.name)).toEqual(expected)
+
+    // Raising a service's priority moves it up the list
+    const coaching = data.services.find((s) => s.name === 'Career Coaching')
+    await request(app).put(`/api/services/${coaching.id}`).set(adminAuth).send({ priority: 'High' })
+    const updated = await request(app).get(`/api/services?placeId=${data.places[0].id}`)
+    expect(updated.body.services.map((s) => s.name)).toEqual(['Career Coaching', 'Counseling', 'Academic Advising', 'Registrar'])
+  })
+
+  test('within a priority, the queue whose first person has waited longest comes first', async () => {
+    await createService({ ...advising, name: 'Academic Advising' })
+    await createService({ ...advising, name: 'Registrar' })
+    await createService({ ...advising, name: 'Financial Aid' })
+    await createService({ ...advising, name: 'Career Coaching', priority: 'Low' })
+    // Adds a waiting ticket to a service, joined `minutesAgo` minutes ago
+    const waitIn = (name, minutesAgo) => {
+      const service = data.services.find((s) => s.name === name)
+      data.queueEntries.push({
+        id: data.queueEntries.length + 1, serviceId: service.id, placeId: service.placeId, userId: 0, ticket: 'X-001',
+        priority: 'Normal', status: 'waiting', joinedAt: new Date(Date.now() - minutesAgo * 60000).toISOString(), queueOrder: 0,
+      })
+    }
+    waitIn('Academic Advising', 2)
+    waitIn('Registrar', 10)
+    waitIn('Registrar', 1)
+    waitIn('Career Coaching', 60) // waited longest, but Low priority stays below Normal
+
+    const list = await request(app).get(`/api/services?placeId=${data.places[0].id}`)
+    // Registrar (10 min) before Advising (2 min); Financial Aid has nobody waiting, so it goes last in its group
+    expect(list.body.services.map((s) => s.name)).toEqual(['Registrar', 'Academic Advising', 'Financial Aid', 'Career Coaching'])
+  })
 })
 
 describe('update', () => {

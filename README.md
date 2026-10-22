@@ -16,7 +16,7 @@ Many organizations struggle with long queues and poor visibility into wait times
 - Receive notifications as their turn approaches
 
 **For Administrators**
-- Create and manage services (name, duration, priority level)
+- Create and manage services (name, duration, priority level — High-priority services and longest-waiting queues are listed first)
 - Monitor active queues in real time
 - View usage statistics and queue history
 

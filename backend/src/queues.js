@@ -8,6 +8,22 @@ const { checkOneOf, checkWholeNumber, findErrors } = require('./validation')
 const PRIORITIES = ['Low', 'Normal', 'High']
 const PRIORITY_ORDER = { High: 0, Normal: 1, Low: 2 }
 
+// Service priority decides which queues are listed first for staff and users:
+// High, then Normal, then Low. Within a priority, the queue whose first person has
+// waited longest comes first; queues with nobody waiting go last, by name.
+// (Ticket priority orders people inside a queue.)
+function byServicePriority(a, b) {
+  return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
+    || oldestJoinTime(a) - oldestJoinTime(b) // Infinity - Infinity is NaN, which falls through to the name
+    || a.name.localeCompare(b.name)
+}
+
+// When the longest-waiting person in this service's line joined, or Infinity if nobody is waiting
+function oldestJoinTime(service) {
+  const times = waitingTickets(service.id).map((entry) => Date.parse(entry.joinedAt))
+  return times.length > 0 ? Math.min(...times) : Infinity
+}
+
 function findService(id) {
   return data.services.find((service) => service.id === Number(id))
 }
@@ -162,6 +178,7 @@ router.get('/me', requireAuth, (req, res) => {
 router.get('/mine', requireAuth, requireAdmin, (req, res) => {
   const services = data.services
     .filter((service) => service.placeId === req.user.placeId)
+    .sort(byServicePriority)
     .map(adminQueueForService)
   const place = data.places.find((candidate) => candidate.id === req.user.placeId)
   res.json({ place, services })
@@ -296,4 +313,4 @@ router.post('/:serviceId/no-show', requireAuth, requireAdmin, (req, res) => {
   res.json({ ticket: publicTicket(current), service: adminQueueForService(service) })
 })
 
-module.exports = { router, estimateWaitMinutes, minutesPerPerson, queueSummary, waitingTickets, servingTicket }
+module.exports = { router, byServicePriority, estimateWaitMinutes, minutesPerPerson, queueSummary, waitingTickets, servingTicket }

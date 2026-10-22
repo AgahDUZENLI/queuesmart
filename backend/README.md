@@ -53,6 +53,8 @@ Each admin runs one place, created when they register. A place's `id` is a rando
 
 Each service belongs to the place of the admin who created it. Admins can only change services at their own place.
 
+**Two kinds of priority.** A service's `priority` decides which queues come first: `GET /api/services` and `GET /api/queues/mine` list High services, then Normal, then Low. Within the same priority, the queue whose first person has waited longest comes first (by join time); queues with nobody waiting go last in their group. Staff see the most urgent, longest-waiting queues at the top, and the order updates as people join and are served. A ticket's `priority` (set by an admin, see Queue API) decides who is served next inside one queue.
+
 | Method | Path | Who | Body | Returns |
 |---|---|---|---|---|
 | GET | `/api/services?placeId=` | anyone | | `200 { services }` |
