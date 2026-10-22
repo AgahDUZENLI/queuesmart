@@ -65,3 +65,4 @@ export const completeServing = (serviceId) => request('POST', `/api/queues/${ser
 export const markNoShow = (serviceId) => request('POST', `/api/queues/${serviceId}/no-show`)
 export const updateQueueTicket = (serviceId, ticketId, updates) => request('PATCH', `/api/queues/${serviceId}/tickets/${ticketId}`, updates)
 export const removeQueueTicket = (ticketId) => request('DELETE', `/api/queues/tickets/${ticketId}`)
+export const getMyHistory = () => request('GET', '/api/history/me?limit=100')
