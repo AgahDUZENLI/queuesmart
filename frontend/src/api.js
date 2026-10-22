@@ -66,3 +66,5 @@ export const markNoShow = (serviceId) => request('POST', `/api/queues/${serviceI
 export const updateQueueTicket = (serviceId, ticketId, updates) => request('PATCH', `/api/queues/${serviceId}/tickets/${ticketId}`, updates)
 export const removeQueueTicket = (ticketId) => request('DELETE', `/api/queues/tickets/${ticketId}`)
 export const getMyHistory = () => request('GET', '/api/history/me?limit=100')
+export const getPlaceHistory = (status) => request('GET', `/api/history?limit=100${status ? `&status=${status}` : ''}`)
+export const getPlaceStats = () => request('GET', '/api/history/stats')

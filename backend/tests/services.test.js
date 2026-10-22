@@ -233,6 +233,30 @@ describe('delete', () => {
     await createService(advising)
     expect((await request(app).delete(`/api/services/${firstId()}`).set(userAuth)).status).toBe(403)
   })
+
+  test('keeps history: people in line are removed, finished visits stay with the service name', async () => {
+    await createService({ ...advising, status: 'Open' })
+    await createService({ ...advising, name: 'Registrar', status: 'Open' })
+    const id = firstId()
+    const other = await request(app).post('/api/auth/register').send({
+      firstName: 'Max', lastName: 'Other', email: 'other@example.edu', password: 'correct-horse',
+    })
+    const otherAuth = { Authorization: `Bearer ${other.body.token}` }
+
+    // Uma is served, Max is still waiting when the service is deleted
+    await request(app).post(`/api/queues/${id}/join`).set(userAuth)
+    await request(app).post(`/api/queues/${id}/next`).set(adminAuth)
+    await request(app).post(`/api/queues/${id}/complete`).set(adminAuth)
+    await request(app).post(`/api/queues/${id}/join`).set(otherAuth)
+    await request(app).delete(`/api/services/${id}`).set(adminAuth)
+
+    expect(data.queueEntries.map((entry) => entry.status)).toEqual(['served', 'removed'])
+    const history = await request(app).get('/api/history/me').set(userAuth)
+    expect(history.body.history[0]).toMatchObject({ serviceName: 'Academic Advising', status: 'served' })
+    // Max's ticket shows as removed, and Max can join another queue
+    expect((await request(app).get('/api/queues/me').set(otherAuth)).body.recent.status).toBe('removed')
+    expect((await request(app).post(`/api/queues/${data.services[0].id}/join`).set(otherAuth)).status).toBe(201)
+  })
 })
 
 test('demo data has valid accounts and the six sample services', async () => {

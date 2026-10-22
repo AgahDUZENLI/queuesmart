@@ -206,6 +206,7 @@ router.post('/:serviceId/join', requireAuth, (req, res) => {
     placeId: service.placeId,
     userId: req.user.id,
     ticket: `${service.name[0].toUpperCase()}-${String(nextNumber).padStart(3, '0')}`,
+    serviceName: service.name, // kept for history if the service is deleted later
     priority: 'Normal',
     status: 'waiting',
     joinedAt: new Date().toISOString(),

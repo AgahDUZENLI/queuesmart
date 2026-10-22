@@ -119,7 +119,10 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
 router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const service = findOwnService(req, res)
   if (!service) return
-  data.queueEntries = data.queueEntries.filter((entry) => entry.serviceId !== service.id)
+  // Keep the tickets so history survives; anyone still in line is removed from it
+  for (const entry of data.queueEntries) {
+    if (entry.serviceId === service.id && ['waiting', 'serving'].includes(entry.status)) entry.status = 'removed'
+  }
   data.services = data.services.filter((s) => s.id !== service.id)
   res.status(204).end()
 })

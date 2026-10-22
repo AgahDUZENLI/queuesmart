@@ -1,10 +1,7 @@
 import Button from '../../components/Button'
 import AdminStatus from './AdminStatus'
 import JoinCodeCard from './JoinCodeCard'
-
-function Metric({ label, value }) {
-  return <div className="admin-metric"><span>{label}</span><strong>{value}</strong></div>
-}
+import Metric from './Metric'
 
 function AdminOverview({ services, today, totalWaiting, openServices, averageWait, currentlyServing, averageDuration, onCreate, onManage, onToggleStatus }) {
   return (

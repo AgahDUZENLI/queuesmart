@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react'
 import './admin.css'
 import AdminDashboard from './AdminDashboard'
 import QueueManagement from './QueueManagement'
+import AdminHistory from './AdminHistory'
 import ServiceManagement from './ServiceManagement'
 import * as api from '../../api'
 import { signOut } from '../../api'
+
+const TABS = { overview: 'Overview', queues: 'Queues', services: 'Services', history: 'History' }
 
 const emptyService = {
   name: '',
@@ -175,9 +178,9 @@ function AdminWorkspace({ goTo, initialPage = 'overview' }) {
           QueueSmart
         </a>
         <nav className="admin-tabs" aria-label="Administrator navigation">
-          {['overview', 'queues', 'services'].map((page) => (
+          {Object.entries(TABS).map(([page, label]) => (
             <button key={page} type="button" className={activePage === page ? 'admin-tab active' : 'admin-tab'} onClick={() => navigateTo(page)}>
-              {page === 'overview' ? 'Overview' : page === 'queues' ? 'Queues' : 'Services'}
+              {label}
             </button>
           ))}
         </nav>
@@ -221,6 +224,7 @@ function AdminWorkspace({ goTo, initialPage = 'overview' }) {
                 onCreateService={createService}
               />
             )}
+            {activePage === 'history' && <AdminHistory />}
             {activePage === 'services' && (
               <ServiceManagement
                 services={services}

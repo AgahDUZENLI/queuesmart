@@ -61,7 +61,7 @@ Each service belongs to the place of the admin who created it. Admins can only c
 | GET | `/api/services/:id` | anyone | | `200 { service }` |
 | POST | `/api/services` | admin | see fields below | `201 { service }` |
 | PUT | `/api/services/:id` | admin | only the fields that change | `200 { service }` |
-| DELETE | `/api/services/:id` | admin | | `204` |
+| DELETE | `/api/services/:id` | admin | | `204`. Past tickets are kept for history; anyone still in line is marked `removed` |
 
 | Field | Rule | Default |
 |---|---|---|
@@ -91,6 +91,18 @@ Wait estimates use the rule `people ahead × minutes per person`. Minutes per pe
 | none | 15 |
 | one visit of 5 min | (5 + 15 + 15 + 15 + 15) / 5 = 13 |
 | five or more | average of the last 5 real visits only | The estimate for a new arrival includes the currently serving ticket, if any. Estimates, queue counts, `averageDuration` and `measuredVisits` are also included in `GET /api/services?placeId=...` and `GET /api/queues/mine`.
+
+## History API
+
+History is built from the same queue tickets, so nothing extra is stored. Each item has `ticket`, `status`, `serviceName`, `placeName`, `name`, `joinedAt`, `startedAt`, `completedAt` and `waitedMinutes`. Newest first.
+
+| Method | Path | Who | Query | Returns | Shown on |
+|---|---|---|---|---|---|
+| GET | `/api/history/me` | user | `status?`, `limit?` (1–100, default 50) | `200 { total, history }` | user History page |
+| GET | `/api/history` | admin | `status?`, `limit?` | `200 { total, history }` for the admin's place | admin History tab |
+| GET | `/api/history/stats` | admin | | `200 { total, waiting, serving, served, left, removed, noShow, averageWaitMinutes }` | admin History tab |
+
+`status` must be one of `waiting`, `serving`, `served`, `left`, `removed`, `no-show`; anything else returns 400.
 
 ## Adding a module
 
