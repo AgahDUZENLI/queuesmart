@@ -6,6 +6,12 @@ const { createUser } = require('./auth')
 const { addService } = require('./services')
 
 const hours = { opens: '09:00', closes: '16:30' }
+const DEMO_USERS = [
+  { firstName: 'Demo', lastName: 'User', email: 'user@queuesmart.test' },
+  { firstName: 'Demo', lastName: 'User2', email: 'user2@queuesmart.test' },
+  { firstName: 'Demo', lastName: 'User3', email: 'user3@queuesmart.test' },
+  { firstName: 'Demo', lastName: 'User4', email: 'user4@queuesmart.test' },
+]
 
 function addAdmin(firstName, placeName, email, code) {
   const admin = createUser({ role: 'admin', firstName, lastName: 'Admin', placeName, email, password: 'demo-pass-123' })
@@ -21,8 +27,10 @@ function loadDemoData() {
   addAdmin('Tia', 'Main Street Tire Shop', 'tires@queuesmart.test', 234567)
   addAdmin('Cal', 'Eastside Health Clinic', 'clinic@queuesmart.test', 345678)
 
-  const user = createUser({ role: 'user', firstName: 'Demo', lastName: 'User', email: 'user@queuesmart.test', password: 'demo-pass-123' })
-  user.savedPlaceIds.push(campus.id)
+  for (const account of DEMO_USERS) {
+    const user = createUser({ role: 'user', ...account, password: 'demo-pass-123' })
+    user.savedPlaceIds.push(campus.id)
+  }
 
   const atCampus = { placeId: campus.id, ...hours }
   addService({
