@@ -4,6 +4,7 @@ const express = require('express')
 const { data, newId } = require('./data')
 const { requireAuth, requireAdmin } = require('./auth')
 const { checkOneOf, checkWholeNumber, findErrors } = require('./validation')
+const { notifyQueueJoined, notifyNearlyServed, notificationsForUser} = require('./notifications')
 
 const PRIORITIES = ['Low', 'Normal', 'High']
 const PRIORITY_ORDER = { High: 0, Normal: 1, Low: 2 }
@@ -169,7 +170,21 @@ const router = express.Router()
 router.get('/me', requireAuth, (req, res) => {
   if (req.user.role !== 'user') return res.status(403).json({ error: 'Only users can view a personal queue ticket.' })
   const ticket = currentTicketForUser(req.user.id)
-  res.json({ ticket, recent: ticket ? null : recentTicketForUser(req.user.id) })
+
+  if (ticket && ticket.status === 'waiting') {
+    notifyNearlyServed(
+      {
+        id: ticket.id,
+        userId: req.user.id,
+        serviceId: ticket.serviceId,
+        status: ticket.status,
+      },
+      ticket.service,
+      ticket.peopleAhead
+    )
+  }
+
+  res.json({ ticket, recent: ticket ? null : recentTicketForUser(req.user.id), notifications: notificationsForUser(req.user.id) })
 })
 
 // GET /api/queues/mine - all queue state for the signed-in admin's place
@@ -212,7 +227,24 @@ router.post('/:serviceId/join', requireAuth, (req, res) => {
   }
   data.queueEntries.push(entry)
 
-  res.status(201).json({ ticket: currentTicketForUser(req.user.id) })
+  // Notify the user that they joined successfully.
+notifyQueueJoined(entry, service)
+
+const ticket = currentTicketForUser(req.user.id)
+
+// Also notify them if they are already close to being served.
+notifyNearlyServed(
+  entry,
+  service,
+  ticket.peopleAhead
+)
+
+res.status(201).json({
+  ticket,
+  notifications: notificationsForUser(req.user.id),
+})
+
+  //res.status(201).json({ ticket: currentTicketForUser(req.user.id) })
 })
 
 // DELETE /api/queues/tickets/:ticketId - a user leaves, or an admin removes, a ticket
