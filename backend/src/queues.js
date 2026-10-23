@@ -9,7 +9,7 @@ const { checkOneOf, checkWholeNumber, findErrors } = require('./validation')
 // The one list of priority levels, used for two things:
 // - a service's priority orders the services (High services are listed first)
 // - a ticket's priority orders people inside one queue. Tickets start as Normal;
-//   only an admin can change it (PATCH /api/queues/:serviceId/tickets/:ticketId).
+//   only an admin can change it 
 const PRIORITIES = ['Low', 'Normal', 'High']
 const PRIORITY_ORDER = { High: 0, Normal: 1, Low: 2 }
 
