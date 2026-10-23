@@ -63,10 +63,10 @@ function SignIn({ goTo, onSignedIn, joinCode }) {
           </button>
         </p>
         <div className="demo-logins">
-          {DEMO_USERS.map((account, index) => (
+          {DEMO_USERS.map((account) => (
             <p key={account.email}>
               <button type="button" className="link-button" onClick={() => signIn(account.email, account.password)}>
-                {index === 0 ? 'Sign in as demo user' : `Sign in as demo user ${index + 1}`}
+                Sign in as {account.name} (demo user)
               </button>
             </p>
           ))}

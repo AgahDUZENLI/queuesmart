@@ -4,11 +4,10 @@
 
 const express = require('express')
 const { data, newId } = require('./data')
-const { queueSummary, byServicePriority } = require('./queues')
+const { queueSummary, byServicePriority, PRIORITIES } = require('./queues')
 const { requireAuth, requireAdmin } = require('./auth')
 const { checkText, checkWholeNumber, checkOneOf, checkTime, checkTrueFalse, findErrors } = require('./validation')
 
-const PRIORITIES = ['Low', 'Normal', 'High']
 const STATUSES = ['Open', 'Paused', 'Closed']
 
 // Used when a new service leaves out one of the optional fields
@@ -127,4 +126,4 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   res.status(204).end()
 })
 
-module.exports = { router, addService, PRIORITIES, STATUSES }
+module.exports = { router, addService, STATUSES }

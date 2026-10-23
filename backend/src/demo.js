@@ -7,10 +7,10 @@ const { addService } = require('./services')
 
 const hours = { opens: '09:00', closes: '16:30' }
 const DEMO_USERS = [
-  { firstName: 'Demo', lastName: 'User', email: 'user@queuesmart.test' },
-  { firstName: 'Demo', lastName: 'User2', email: 'user2@queuesmart.test' },
-  { firstName: 'Demo', lastName: 'User3', email: 'user3@queuesmart.test' },
-  { firstName: 'Demo', lastName: 'User4', email: 'user4@queuesmart.test' },
+  { firstName: 'Maya', lastName: 'Robinson', email: 'user@queuesmart.test' },
+  { firstName: 'Jordan', lastName: 'Lee', email: 'user2@queuesmart.test' },
+  { firstName: 'Priya', lastName: 'Shah', email: 'user3@queuesmart.test' },
+  { firstName: 'Sam', lastName: 'Carter', email: 'user4@queuesmart.test' },
 ]
 
 function addAdmin(firstName, placeName, email, code) {

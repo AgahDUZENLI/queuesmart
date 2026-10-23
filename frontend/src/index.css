@@ -81,6 +81,11 @@ form {
   color: var(--black);
 }
 
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* Looks like a link, but it is a button because it switches pages */
 .link-button {
   padding: 0;

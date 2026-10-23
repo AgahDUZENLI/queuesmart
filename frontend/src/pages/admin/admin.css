@@ -207,6 +207,7 @@
 .serving-person > p:nth-child(2) { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; font-size: 19px; }
 .serving-person strong { font-size: 22px; }
 .serving-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.overview-serving .now-serving { margin-bottom: 12px; }
 .queue-table th:first-child,
 .queue-table td:first-child { padding-left: 0; color: var(--gray); }
 .queue-table tbody th { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }

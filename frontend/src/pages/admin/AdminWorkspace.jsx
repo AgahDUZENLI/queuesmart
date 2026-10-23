@@ -207,6 +207,9 @@ function AdminWorkspace({ goTo, initialPage = 'overview' }) {
                 onCreate={createService}
                 onManage={(serviceId) => { setSelectedServiceId(serviceId); setShowAllQueues(false); navigateTo('queues') }}
                 onToggleStatus={(service) => updateService(service.id, { status: service.status === 'Open' ? 'Paused' : 'Open' })}
+                onServeNext={(serviceId) => runQueueAction(() => api.serveNext(serviceId))}
+                onComplete={(serviceId) => runQueueAction(() => api.completeServing(serviceId))}
+                onNoShow={(serviceId) => runQueueAction(() => api.markNoShow(serviceId))}
               />
             )}
             {activePage === 'queues' && (

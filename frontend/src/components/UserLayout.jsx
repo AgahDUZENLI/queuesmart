@@ -1,6 +1,6 @@
 // Shared frame for the user pages: top nav (same look as the admin side),
 // then the page title and the page content.
-import { signOut } from '../api'
+import { getCurrentUser, signOut } from '../api'
 
 const links = [
   { page: 'user-dashboard', label: 'Home' },
@@ -13,6 +13,7 @@ function UserLayout({ title, subtitle, active, goTo, queue, children }) {
   // Notification bar: the newest notification, until it is read
   const latest = queue?.notifications[0]
   const showBar = latest && !latest.read
+  const user = getCurrentUser()
 
   return (
     <div>
@@ -32,7 +33,7 @@ function UserLayout({ title, subtitle, active, goTo, queue, children }) {
           ))}
         </nav>
         <div className="nav-account">
-          <span>Maya Robinson</span>
+          <span>{user ? `${user.firstName} ${user.lastName}` : ''}</span>
           <button type="button" className="link-button" onClick={() => { signOut(); goTo('sign-in') }}>
             Sign out
           </button>

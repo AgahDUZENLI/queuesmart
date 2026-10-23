@@ -1,5 +1,6 @@
 // Field checks. Each returns an error message, or '' when the value is fine.
-// Same rules as frontend/src/utils/validation.js.
+// The front end (frontend/src/utils/validation.js and the service form) uses the same limits,
+// but this is the check that counts: every request is validated here.
 
 function checkText(value, label, maxLength = 50) {
   if (value === undefined || value === null) return `${label} is required.`

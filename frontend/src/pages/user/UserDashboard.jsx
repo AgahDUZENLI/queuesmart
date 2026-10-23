@@ -9,13 +9,14 @@ import Button from '../../components/Button'
 import Notifications from '../../components/Notifications'
 import WaitWheel from '../../components/WaitWheel'
 import { ordinal, waitProgress } from '../../utils/queueRules'
+import { getCurrentUser } from '../../api'
 
 function UserDashboard({ goTo, queue }) {
     const { places, services, ticket, service, place, minutesLeft } = queue
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
     return (
-        <UserLayout title="Hi, Maya" subtitle={today} active="user-dashboard" goTo={goTo} queue={queue}>
+        <UserLayout title={`Hi, ${getCurrentUser()?.firstName || 'there'}`} subtitle={today} active="user-dashboard" goTo={goTo} queue={queue}>
             <div className="two-panels">
                 <section className="section">
                     <h2>Your place in line</h2>
@@ -26,7 +27,7 @@ function UserDashboard({ goTo, queue }) {
                                 progress={waitProgress(ticket, minutesLeft)}
                                 label={ticket.status === 'serving' ? `${ticket.number} · Being served` : `${ticket.number} · ${ordinal(ticket.peopleAhead + 1)} in line`}
                             />
-                            <p>{service.name} at {place.name}{service.room ? `, ${service.room}` : ''} · joined {ticket.joinedAt}</p>
+                            <p>{service.name} at {place.name} · joined {ticket.joinedAt}</p>
                             <Button variant="secondary" onClick={() => goTo('queue-status')}>
                                 View ticket
                             </Button>

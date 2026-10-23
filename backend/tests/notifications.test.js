@@ -1,6 +1,7 @@
 const request = require('supertest')
 const { createApp } = require('../src/app')
 const { data, reset } = require('../src/data')
+const { ordinal } = require('../src/queues')
 
 let app
 let adminAuth
@@ -37,26 +38,38 @@ describe('notifications', () => {
     const notifications = await myNotifications(userAuth)
     expect(notifications[notifications.length - 1]).toMatchObject({
       type: 'Queue update',
-      message: 'You joined Advising. You are number 1 in line.',
+      message: 'You joined Advising. You are 1st in line.',
       read: false,
     })
   })
 
-  test('the first person waiting is told they are next, only once', async () => {
+  test('the first person waiting is told they are next once nobody is ahead of them, only once', async () => {
+    const next = 'You are next in line for Advising. Please get ready.'
     await join(userAuth)
     await join(otherUserAuth)
-    expect(await messages(userAuth)).toContain('You are next in line for Advising. Please get ready.')
-    expect(await messages(otherUserAuth)).not.toContain('You are next in line for Advising. Please get ready.')
+    expect(await messages(userAuth)).toContain(next)
+    expect(await messages(otherUserAuth)).not.toContain(next)
 
-    // Serving the first person moves the second to the front of the line
+    // The second person is first in line now, but someone is still being served ahead of them
     await request(app).post(`/api/queues/${serviceId()}/next`).set(adminAuth)
     expect(await messages(userAuth)).toContain("It's your turn at Advising.")
-    expect(await messages(otherUserAuth)).toContain('You are next in line for Advising. Please get ready.')
+    expect(await messages(otherUserAuth)).not.toContain(next)
 
     await request(app).post(`/api/queues/${serviceId()}/complete`).set(adminAuth)
-    const nextCount = (await messages(otherUserAuth)).filter((m) => m.startsWith('You are next')).length
-    expect(nextCount).toBe(1)
     expect(await messages(userAuth)).toContain('You have been served at Advising.')
+    expect(await messages(otherUserAuth)).toContain(next)
+
+    // Calling and finishing again does not repeat it
+    await request(app).post(`/api/queues/${serviceId()}/next`).set(adminAuth)
+    await request(app).post(`/api/queues/${serviceId()}/no-show`).set(adminAuth)
+    expect((await messages(otherUserAuth)).filter((m) => m === next)).toHaveLength(1)
+  })
+
+  test('a user who joins behind someone being served is not told they are next', async () => {
+    await join(otherUserAuth)
+    await request(app).post(`/api/queues/${serviceId()}/next`).set(adminAuth)
+    await join(userAuth)
+    expect(await messages(userAuth)).not.toContain('You are next in line for Advising. Please get ready.')
   })
 
   test('leaving, removal and no-show each notify the user', async () => {
@@ -91,6 +104,23 @@ describe('notifications', () => {
 
     const other = await request(app).post(`/api/notifications/${first.id}/read`).set(otherUserAuth)
     expect(other.status).toBe(404)
+  })
+
+  test('the "you are next" notification is marked emailed only for users who chose Email me', async () => {
+    const noEmailAuth = await register({ firstName: 'Nia', email: 'noemail@example.edu', emailMe: false })
+    await join(userAuth)
+    const [next] = await myNotifications(userAuth)
+    expect(next).toMatchObject({ message: 'You are next in line for Advising. Please get ready.', emailed: true })
+
+    await request(app).post(`/api/queues/${serviceId()}/next`).set(adminAuth)
+    await request(app).post(`/api/queues/${serviceId()}/complete`).set(adminAuth)
+    await join(noEmailAuth)
+    const notifications = await myNotifications(noEmailAuth)
+    expect(notifications.every((n) => n.emailed === false)).toBe(true)
+  })
+
+  test('ordinal gives 1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 21st, 22nd, 111th', () => {
+    expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 111].map(ordinal)).toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '111th'])
   })
 
   test('notifications require sign-in', async () => {

@@ -6,6 +6,10 @@ const { requireAuth, requireAdmin } = require('./auth')
 const { addNotification, notifyNextInLine } = require('./notifications')
 const { checkOneOf, checkWholeNumber, findErrors } = require('./validation')
 
+// The one list of priority levels, used for two things:
+// - a service's priority orders the services (High services are listed first)
+// - a ticket's priority orders people inside one queue. Tickets start as Normal;
+//   only an admin can change it (PATCH /api/queues/:serviceId/tickets/:ticketId).
 const PRIORITIES = ['Low', 'Normal', 'High']
 const PRIORITY_ORDER = { High: 0, Normal: 1, Low: 2 }
 
@@ -67,12 +71,26 @@ function estimateWaitMinutes(service, peopleAhead) {
   return Math.ceil(Number((minutesPerPerson(service) * Math.max(0, peopleAhead)).toFixed(2)))
 }
 
+// Minutes the person being served still needs: the usual visit length minus the time
+// they've been there so far. Never below 1 while someone is still being served.
+function servingMinutesLeft(service, serving) {
+  if (!serving) return 0
+  const minutesIn = (Date.now() - Date.parse(serving.startedAt)) / 60000
+  return Math.max(1, minutesPerPerson(service) - minutesIn)
+}
+
+// Wait for someone with `waitingAhead` waiting tickets in front of them:
+// what's left of the current visit + a full visit for each person waiting ahead
+function estimateWaitFromNow(service, waitingAhead) {
+  const minutes = servingMinutesLeft(service, servingTicket(service.id)) + minutesPerPerson(service) * Math.max(0, waitingAhead)
+  return Math.ceil(Number(minutes.toFixed(2)))
+}
+
 function queueSummary(service) {
   const waiting = waitingTickets(service.id)
-  const serving = servingTicket(service.id)
   return {
     waiting: waiting.length,
-    wait: estimateWaitMinutes(service, waiting.length + (serving ? 1 : 0)),
+    wait: estimateWaitFromNow(service, waiting.length),
     averageDuration: Math.round(minutesPerPerson(service)), // learned minutes per visit
     measuredVisits: recentVisitMinutes(service.id).length, // how many of today's visits that average uses (max 5)
   }
@@ -107,7 +125,7 @@ function currentTicketForUser(userId) {
     ...publicTicket(entry),
     position: entry.status === 'serving' ? 0 : position,
     peopleAhead,
-    estimatedWaitMinutes: estimateWaitMinutes(service, peopleAhead),
+    estimatedWaitMinutes: entry.status === 'serving' ? 0 : estimateWaitFromNow(service, position - 1),
     service: { ...service, ...queueSummary(service) },
   }
 }
@@ -134,9 +152,23 @@ function adminQueueForService(service) {
       ? {
           ...publicTicket(serving),
           started: new Date(serving.startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          minutesIn: Math.max(0, Math.floor((Date.now() - Date.parse(serving.startedAt)) / 60000)),
+          minutesLeft: Math.ceil(servingMinutesLeft(service, serving)),
         }
       : null,
   }
+}
+
+// 1 → 1st, 2 → 2nd, 3 → 3rd, 4 → 4th, 11 → 11th, 21 → 21st (same as ordinal in frontend/src/utils/queueRules.js)
+function ordinal(number) {
+  const lastTwo = number % 100
+  if (lastTwo >= 11 && lastTwo <= 13) return `${number}th`
+  return number + ({ 1: 'st', 2: 'nd', 3: 'rd' }[number % 10] || 'th')
+}
+
+// Sends the "you are next" notification when someone has nobody ahead of them
+function notifyIfNext(service) {
+  notifyNextInLine(service, waitingTickets(service.id), servingTicket(service.id))
 }
 
 function reindexQueue(queue) {
@@ -214,8 +246,8 @@ router.post('/:serviceId/join', requireAuth, (req, res) => {
   data.queueEntries.push(entry)
 
   const ticket = currentTicketForUser(req.user.id)
-  addNotification(req.user.id, 'Queue update', `You joined ${service.name}. You are number ${ticket.position} in line.`)
-  notifyNextInLine(service, waitingTickets(service.id))
+  addNotification(req.user.id, 'Queue update', `You joined ${service.name}. You are ${ordinal(ticket.position)} in line.`)
+  notifyIfNext(service)
   res.status(201).json({ ticket })
 })
 
@@ -239,7 +271,7 @@ router.delete('/tickets/:ticketId', requireAuth, (req, res) => {
     addNotification(entry.userId, 'Status change', 'Your ticket was removed from the queue.')
   }
 
-  if (service) notifyNextInLine(service, waitingTickets(service.id))
+  if (service) notifyIfNext(service)
   res.status(204).end()
 })
 
@@ -282,7 +314,7 @@ router.patch('/:serviceId/tickets/:ticketId', requireAuth, requireAdmin, (req, r
     entry.priority = nextPriority
   }
 
-  notifyNextInLine(service, waitingTickets(service.id))
+  notifyIfNext(service)
   res.json({ ticket: publicTicket(entry), queue: adminQueueForService(service).queue })
 })
 
@@ -297,7 +329,6 @@ router.post('/:serviceId/next', requireAuth, requireAdmin, (req, res) => {
   next.status = 'serving'
   next.startedAt = new Date().toISOString()
   addNotification(next.userId, 'Status change', `It's your turn at ${service.name}.`)
-  notifyNextInLine(service, waitingTickets(service.id))
   res.json({ ticket: publicTicket(next), service: adminQueueForService(service) })
 })
 
@@ -310,6 +341,7 @@ router.post('/:serviceId/complete', requireAuth, requireAdmin, (req, res) => {
   current.status = 'served'
   current.completedAt = new Date().toISOString()
   addNotification(current.userId, 'Status change', `You have been served at ${service.name}.`)
+  notifyIfNext(service)
   res.json({ ticket: publicTicket(current), service: adminQueueForService(service) })
 })
 
@@ -321,7 +353,8 @@ router.post('/:serviceId/no-show', requireAuth, requireAdmin, (req, res) => {
   if (!current) return res.status(409).json({ error: 'There is no ticket currently being served.' })
   current.status = 'no-show'
   addNotification(current.userId, 'Status change', 'Your ticket was marked as a no-show.')
+  notifyIfNext(service)
   res.json({ ticket: publicTicket(current), service: adminQueueForService(service) })
 })
 
-module.exports = { router, byServicePriority, estimateWaitMinutes, minutesPerPerson, queueSummary, waitingTickets, servingTicket }
+module.exports = { router, PRIORITIES, ordinal, byServicePriority, estimateWaitMinutes, estimateWaitFromNow, minutesPerPerson, queueSummary, waitingTickets, servingTicket }

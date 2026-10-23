@@ -1,14 +1,9 @@
 // Business rules for joining and waiting in a queue.
 
-// Basic estimate: each person ahead takes one service-duration interval.
-export function minutesPerPerson(service) {
-  return Math.max(0, Number(service.duration) || 0)
-}
+// Priority levels for services and tickets (same list as backend/src/queues.js)
+export const PRIORITIES = ['Low', 'Normal', 'High']
 
-// Estimated wait = people ahead of you × minutes per person
-export function estimateWait(service, peopleAhead) {
-  return Math.ceil(Math.max(0, peopleAhead) * minutesPerPerson(service))
-}
+// Wait estimates come from the backend (estimatedWaitMinutes on the ticket, wait on each service).
 
 // Returns why the user can't join, or '' when they can
 export function checkCanJoin(service, ticket) {
@@ -30,10 +25,9 @@ export function waitProgress(ticket, minutesLeft) {
   return Math.min(1, Math.max(0, 1 - minutesLeft / ticket.waitAtJoin))
 }
 
-// 1 → 1st, 2 → 2nd, 3 → 3rd, 4 → 4th ...
+// 1 → 1st, 2 → 2nd, 3 → 3rd, 4 → 4th, 11 → 11th, 21 → 21st (same as ordinal in backend/src/queues.js)
 export function ordinal(number) {
-  if (number === 1) return '1st'
-  if (number === 2) return '2nd'
-  if (number === 3) return '3rd'
-  return `${number}th`
+  const lastTwo = number % 100
+  if (lastTwo >= 11 && lastTwo <= 13) return `${number}th`
+  return number + ({ 1: 'st', 2: 'nd', 3: 'rd' }[number % 10] || 'th')
 }

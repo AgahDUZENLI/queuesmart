@@ -3,7 +3,9 @@ import AdminStatus from './AdminStatus'
 import JoinCodeCard from './JoinCodeCard'
 import Metric from './Metric'
 
-function AdminOverview({ services, today, totalWaiting, openServices, averageWait, currentlyServing, averageDuration, onCreate, onManage, onToggleStatus }) {
+function AdminOverview({ services, today, totalWaiting, openServices, averageWait, currentlyServing, averageDuration, onCreate, onManage, onToggleStatus, onServeNext, onComplete, onNoShow }) {
+  // Open services, plus any still finishing someone after being paused
+  const servingServices = services.filter((service) => service.status === 'Open' || service.nowServing)
   return (
     <>
       <div className="admin-page-heading">
@@ -20,6 +22,43 @@ function AdminOverview({ services, today, totalWaiting, openServices, averageWai
         <Metric label="Currently serving" value={currentlyServing} />
         <Metric label="Average visit"value={`${averageDuration} min`} />
       </section>
+      {servingServices.length > 0 && (
+        <section className="admin-section overview-serving">
+          <div className="admin-section-heading">
+            <h2>Serving now</h2>
+            <span className="admin-muted">Call people in, then press Done when they leave</span>
+          </div>
+          {servingServices.map((service) => {
+            const serving = service.nowServing
+            const next = service.queue[0]
+            return (
+              <div key={service.id} className="now-serving" aria-label={`${service.name} serving`}>
+                <div className="serving-person">
+                  <p className="admin-muted">{service.name} · {service.waiting} waiting</p>
+                  {serving ? (
+                    <>
+                      <p><strong>{serving.ticket}</strong><span>{serving.name}</span></p>
+                      <p className="admin-muted">Started {serving.started} · {serving.minutesIn} min in · about {serving.minutesLeft} min left</p>
+                    </>
+                  ) : (
+                    <p className="admin-muted">{next ? `No one is being served. Next up: ${next.ticket} · ${next.name}` : 'No one in line'}</p>
+                  )}
+                </div>
+                <div className="serving-actions">
+                  {serving ? (
+                    <>
+                      <Button variant="secondary" onClick={() => onNoShow(service.id)}>No-show</Button>
+                      <Button onClick={() => onComplete(service.id)}>Done</Button>
+                    </>
+                  ) : next && (
+                    <Button onClick={() => onServeNext(service.id)}>Call next: {next.ticket}</Button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </section>
+      )}
       <section className="admin-section">
         <div className="admin-section-heading">
           <h2>Queues</h2>

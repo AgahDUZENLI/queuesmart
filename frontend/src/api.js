@@ -4,6 +4,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
 // Session token from login/register, sent on every request
 let token = null
+// The signed-in user ({ firstName, lastName, ... }), shown in the page header
+let currentUser = null
+
+export const getCurrentUser = () => currentUser
 
 // Sends a request and returns the JSON body.
 // Throws an Error with `fields` (per-field messages) when the backend says no.
@@ -28,28 +32,31 @@ async function request(method, path, body) {
 
 // Demo accounts loaded by backend/src/demo.js
 export const DEMO_USERS = [
-  { email: 'user@queuesmart.test', password: 'demo-pass-123' },
-  { email: 'user2@queuesmart.test', password: 'demo-pass-123' },
-  { email: 'user3@queuesmart.test', password: 'demo-pass-123' },
-  { email: 'user4@queuesmart.test', password: 'demo-pass-123' },
+  { name: 'Maya Robinson', email: 'user@queuesmart.test', password: 'demo-pass-123' },
+  { name: 'Jordan Lee', email: 'user2@queuesmart.test', password: 'demo-pass-123' },
+  { name: 'Priya Shah', email: 'user3@queuesmart.test', password: 'demo-pass-123' },
+  { name: 'Sam Carter', email: 'user4@queuesmart.test', password: 'demo-pass-123' },
 ]
 export const DEMO_ADMIN = { email: 'admin@queuesmart.test', password: 'demo-pass-123' }
 
 export async function login(email, password, role) {
   const data = await request('POST', '/api/auth/login', { email, password, role })
   token = data.token
+  currentUser = data.user
   return data.user
 }
 
 export async function register(account) {
   const data = await request('POST', '/api/auth/register', account)
   token = data.token
+  currentUser = data.user
   return data.user
 }
 
 export function signOut() {
   if (token) request('POST', '/api/auth/logout').catch(() => {})
   token = null
+  currentUser = null
 }
 
 export const getSavedPlaces = () => request('GET', '/api/places/saved')

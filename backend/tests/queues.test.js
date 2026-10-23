@@ -310,3 +310,43 @@ describe('learning visit length from real visits', () => {
     expect((await request(app).get('/api/queues/me').set(otherUserAuth)).body.ticket.peopleAhead).toBe(0)
   })
 })
+
+describe('wait estimate counts down during the current visit', () => {
+  // Pretend the person being served was called `minutes` ago
+  function startedMinutesAgo(minutes) {
+    const serving = data.queueEntries.find((entry) => entry.status === 'serving')
+    serving.startedAt = new Date(Date.now() - minutes * 60000).toISOString()
+  }
+
+  beforeEach(async () => {
+    await join()
+    await join(otherUserAuth)
+    await request(app).post(`/api/queues/${serviceId()}/next`).set(adminAuth)
+  })
+
+  test('the time already spent is taken off the next person\'s wait', async () => {
+    startedMinutesAgo(10)
+    const res = await request(app).get('/api/queues/me').set(otherUserAuth)
+    expect(res.body.ticket).toMatchObject({ peopleAhead: 1, estimatedWaitMinutes: 5 })
+
+    const services = await request(app).get(`/api/services?placeId=${data.places[0].id}`)
+    expect(services.body.services[0].wait).toBe(20) // 5 left + 15 for the person waiting
+  })
+
+  test('a visit that runs over still counts as 1 minute left', async () => {
+    startedMinutesAgo(30)
+    const res = await request(app).get('/api/queues/me').set(otherUserAuth)
+    expect(res.body.ticket.estimatedWaitMinutes).toBe(1)
+  })
+
+  test('the person being served has no wait left', async () => {
+    const res = await request(app).get('/api/queues/me').set(userAuth)
+    expect(res.body.ticket).toMatchObject({ status: 'serving', estimatedWaitMinutes: 0 })
+  })
+
+  test('admins see how long the current visit has run and about how long is left', async () => {
+    startedMinutesAgo(10)
+    const res = await request(app).get('/api/queues/mine').set(adminAuth)
+    expect(res.body.services[0].nowServing).toMatchObject({ minutesIn: 10, minutesLeft: 5 })
+  })
+})

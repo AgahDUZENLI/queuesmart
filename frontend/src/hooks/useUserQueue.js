@@ -60,7 +60,7 @@ function useUserQueue() {
     const saved = await api.getSavedPlaces()
     const lists = await Promise.all(saved.places.map((p) => api.getServices(p.id)))
     setPlaces(saved.places)
-    setServices(lists.flatMap((list) => list.services.map((service) => ({ ...service, room: service.room || '' }))))
+    setServices(lists.flatMap((list) => list.services))
     const current = await api.getMyQueueTicket()
     setQueueError('')
     setTicket(toTicket(current.ticket))

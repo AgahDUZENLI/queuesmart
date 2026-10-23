@@ -14,7 +14,7 @@ Or run everything from the repo root with `docker compose up -d`.
 
 Demo accounts, places and services are loaded on startup from `src/demo.js`. Demo join codes: `123456` (Student Services Center), `234567` (Main Street Tire Shop), `345678` (Eastside Health Clinic).
 
-Demo user logins (all use password `demo-pass-123`): `user@queuesmart.test`, `user2@queuesmart.test`, `user3@queuesmart.test`, and `user4@queuesmart.test`. Each demo user has the Student Services Center saved.
+Demo user logins (all use password `demo-pass-123`): `user@queuesmart.test` (Maya Robinson), `user2@queuesmart.test` (Jordan Lee), `user3@queuesmart.test` (Priya Shah), and `user4@queuesmart.test` (Sam Carter). Each demo user has the Student Services Center saved.
 
 ## Files
 
@@ -95,7 +95,7 @@ Wait estimates use the rule `people ahead × minutes per person`. Minutes per pe
 |---|---|
 | none | 15 |
 | one visit of 5 min | (5 + 15 + 15 + 15 + 15) / 5 = 13 |
-| five or more | average of the last 5 real visits only | The estimate for a new arrival includes the currently serving ticket, if any. Estimates, queue counts, `averageDuration` and `measuredVisits` are also included in `GET /api/services?placeId=...` and `GET /api/queues/mine`.
+| five or more | average of the last 5 real visits only | Wait = time left for the person being served (minutes per person minus how long they've been there, at least 1) + minutes per person × people waiting ahead, so estimates count down during a visit. `GET /api/queues/mine` also gives `minutesIn` and `minutesLeft` for the ticket being served. Estimates, queue counts, `averageDuration` and `measuredVisits` are also included in `GET /api/services?placeId=...` and `GET /api/queues/mine`.
 
 ## History API
 
@@ -111,11 +111,11 @@ History is built from the same queue tickets, so nothing extra is stored. Each i
 
 ## Notifications API
 
-Created automatically by the queue routes: when a user joins or leaves, when they become first in line ("You are next", sent once per ticket), when they are called, served, marked a no-show, or removed by staff. Nothing is emailed; the front end shows them on the user's Home page.
+Created automatically by the queue routes: when a user joins or leaves, when they become first in line ("You are next", sent once per ticket), when they are called, served, marked a no-show, or removed by staff. The front end shows them on the user's Home page. Users who ticked "Email me when it's almost my turn" (`emailMe`) also get the "you are next" one by mock email: it is logged by the server and marked `emailed: true`, since no real email is sent yet.
 
 | Method | Path | Who | Returns |
 |---|---|---|---|
-| GET | `/api/notifications/me` | signed in | `200 { notifications }`, newest first: `{ id, type, message, createdAt, read }` |
+| GET | `/api/notifications/me` | signed in | `200 { notifications }`, newest first: `{ id, type, message, createdAt, read, emailed }` |
 | POST | `/api/notifications/:id/read` | signed in (owner) | `200 { notification }`, or `404` |
 
 ## Adding a module

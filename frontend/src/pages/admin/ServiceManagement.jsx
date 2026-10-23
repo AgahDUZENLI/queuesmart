@@ -1,5 +1,6 @@
 import Button from '../../components/Button'
 import AdminStatus from './AdminStatus'
+import { PRIORITIES } from '../../utils/queueRules'
 
 function ServiceManagement({ services, selectedService, selectedServiceId, draft, editing, onOpenEditor, onDraftChange, onSave, onCancel, onDelete }) {
   return (
@@ -36,7 +37,7 @@ function ServiceManagement({ services, selectedService, selectedServiceId, draft
             </label>
             <label className="field admin-field">
               <span>Description</span>
-              <textarea required rows="3" value={draft.description} onChange={(event) => onDraftChange('description', event.target.value)} />
+              <textarea required maxLength="500" rows="3" value={draft.description} onChange={(event) => onDraftChange('description', event.target.value)} />
             </label>
             <div className="admin-field-grid">
               <label className="field admin-field">
@@ -51,7 +52,7 @@ function ServiceManagement({ services, selectedService, selectedServiceId, draft
             <fieldset className="priority-field">
               <legend>Priority</legend>
               <div className="priority-options">
-                {['Low', 'Normal', 'High'].map((priority) => (
+                {PRIORITIES.map((priority) => (
                   <label key={priority}>
                     <input type="radio" name="priority" value={priority} checked={draft.priority === priority} onChange={() => onDraftChange('priority', priority)} />
                     {priority}

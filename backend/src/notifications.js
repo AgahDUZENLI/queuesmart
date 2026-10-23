@@ -13,18 +13,30 @@ function addNotification(userId, type, message) {
     message,
     createdAt: new Date().toISOString(),
     read: false,
+    emailed: false,
   }
   data.notifications.push(notification)
   return notification
 }
 
-// Tells the first person waiting in a line that they are next, once per ticket.
+// Tells the first person waiting that they are next, once per ticket. Only sent when
+// nobody is being served, so it matches "Almost ready" on the Queue status page.
 // `queue` is the service's waiting tickets in order (see waitingTickets in queues.js).
-function notifyNextInLine(service, queue) {
+function notifyNextInLine(service, queue, serving) {
   const next = queue[0]
-  if (!next || next.closeNotified) return
+  if (serving || !next || next.closeNotified) return
   next.closeNotified = true
-  addNotification(next.userId, 'Status change', `You are next in line for ${service.name}. Please get ready.`)
+  const notification = addNotification(next.userId, 'Status change', `You are next in line for ${service.name}. Please get ready.`)
+  sendMockEmail(notification)
+}
+
+// Users who ticked "Email me when it's almost my turn" (emailMe) also get the
+// "you are next" message by email. No real email is sent yet: it is logged instead.
+function sendMockEmail(notification) {
+  const user = data.users.find((u) => u.id === notification.userId)
+  if (!user || !user.emailMe) return
+  notification.emailed = true
+  if (process.env.NODE_ENV !== 'test') console.log(`[mock email] to ${user.email}: ${notification.message}`)
 }
 
 const router = express.Router()

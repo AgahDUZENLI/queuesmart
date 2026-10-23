@@ -1,5 +1,6 @@
 import Button from '../../components/Button'
 import AdminStatus from './AdminStatus'
+import { PRIORITIES } from '../../utils/queueRules'
 
 function AllServiceQueues({ services, onManageService }) {
   return services.map((service) => (
@@ -125,7 +126,7 @@ function QueueManagement({ services, selectedService, showAllQueues, nowServing,
                     <td>
                       <label className="sr-only" htmlFor={`priority-${person.id}`}>Priority for {person.name}</label>
                       <select id={`priority-${person.id}`} value={person.priority} onChange={(event) => onUpdatePriority(person.id, event.target.value)}>
-                        {['High', 'Normal', 'Low'].map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+                        {PRIORITIES.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
                       </select>
                     </td>
                     <td>{person.waiting} min</td>

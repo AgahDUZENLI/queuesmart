@@ -63,7 +63,7 @@ function QueueStatus({ goTo, queue }) {
                         <div><dt>Position</dt><dd>{ordinal(ticket.peopleAhead + 1)} in line</dd></div>
                         <div><dt>Estimated wait</dt><dd>{ticket.status === "serving" ? "Being served" : ticket.peopleAhead === 0 ? "You're next" : `about ${minutesLeft} min`}</dd></div>
                         <div><dt>Joined</dt><dd>{ticket.joinedAt}</dd></div>
-                        <div><dt>Where</dt><dd>{place.name}{service.room ? `, ${service.room}` : ''}</dd></div>
+                        <div><dt>Where</dt><dd>{place.name}</dd></div>
                     </dl>
 
                     <ol className="status-steps" aria-label="Status">
