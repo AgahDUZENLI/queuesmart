@@ -3,6 +3,7 @@
 const express = require('express')
 const { data, newId } = require('./data')
 const { requireAuth, requireAdmin } = require('./auth')
+const { addNotification, notifyNextInLine } = require('./notifications')
 const { checkOneOf, checkWholeNumber, findErrors } = require('./validation')
 
 const PRIORITIES = ['Low', 'Normal', 'High']
@@ -212,7 +213,10 @@ router.post('/:serviceId/join', requireAuth, (req, res) => {
   }
   data.queueEntries.push(entry)
 
-  res.status(201).json({ ticket: currentTicketForUser(req.user.id) })
+  const ticket = currentTicketForUser(req.user.id)
+  addNotification(req.user.id, 'Queue update', `You joined ${service.name}. You are number ${ticket.position} in line.`)
+  notifyNextInLine(service, waitingTickets(service.id))
+  res.status(201).json({ ticket })
 })
 
 // DELETE /api/queues/tickets/:ticketId - a user leaves, or an admin removes, a ticket
@@ -222,17 +226,20 @@ router.delete('/tickets/:ticketId', requireAuth, (req, res) => {
   ))
   if (!entry) return res.status(404).json({ error: 'Active queue ticket not found.' })
 
+  const service = findService(entry.serviceId)
   if (req.user.role === 'user') {
     if (entry.userId !== req.user.id) return res.status(403).json({ error: 'You can only leave your own queue ticket.' })
     entry.status = 'left'
+    addNotification(entry.userId, 'Queue update', `You left the queue for ${entry.serviceName}.`)
   } else {
-    const service = findService(entry.serviceId)
     if (!service || service.placeId !== req.user.placeId) {
       return res.status(403).json({ error: 'You can only manage queues at your own place.' })
     }
     entry.status = 'removed'
+    addNotification(entry.userId, 'Status change', 'Your ticket was removed from the queue.')
   }
 
+  if (service) notifyNextInLine(service, waitingTickets(service.id))
   res.status(204).end()
 })
 
@@ -275,6 +282,7 @@ router.patch('/:serviceId/tickets/:ticketId', requireAuth, requireAdmin, (req, r
     entry.priority = nextPriority
   }
 
+  notifyNextInLine(service, waitingTickets(service.id))
   res.json({ ticket: publicTicket(entry), queue: adminQueueForService(service).queue })
 })
 
@@ -288,6 +296,8 @@ router.post('/:serviceId/next', requireAuth, requireAdmin, (req, res) => {
   if (!next) return res.status(409).json({ error: 'There are no waiting tickets.' })
   next.status = 'serving'
   next.startedAt = new Date().toISOString()
+  addNotification(next.userId, 'Status change', `It's your turn at ${service.name}.`)
+  notifyNextInLine(service, waitingTickets(service.id))
   res.json({ ticket: publicTicket(next), service: adminQueueForService(service) })
 })
 
@@ -299,6 +309,7 @@ router.post('/:serviceId/complete', requireAuth, requireAdmin, (req, res) => {
   if (!current) return res.status(409).json({ error: 'There is no ticket currently being served.' })
   current.status = 'served'
   current.completedAt = new Date().toISOString()
+  addNotification(current.userId, 'Status change', `You have been served at ${service.name}.`)
   res.json({ ticket: publicTicket(current), service: adminQueueForService(service) })
 })
 
@@ -309,6 +320,7 @@ router.post('/:serviceId/no-show', requireAuth, requireAdmin, (req, res) => {
   const current = servingTicket(service.id)
   if (!current) return res.status(409).json({ error: 'There is no ticket currently being served.' })
   current.status = 'no-show'
+  addNotification(current.userId, 'Status change', 'Your ticket was marked as a no-show.')
   res.json({ ticket: publicTicket(current), service: adminQueueForService(service) })
 })
 

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { initialTicket, initialNotifications } from "../data/userQueue";
+import { initialTicket } from "../data/userQueue";
 import * as api from '../api'
-import { ordinal } from '../utils/queueRules'
 
 // How each finished ticket status is shown in the History table
 const OUTCOMES = { served: 'Served', left: 'Left queue', 'no-show': 'No-show', removed: 'Removed by staff' }
@@ -16,8 +15,9 @@ function toHistoryRow(item) {
   }
 }
 
-function timeNow() {
-  return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+// Turns a notification from GET /api/notifications/me into what the Notifications list shows
+function toNotification(item) {
+  return { ...item, time: new Date(item.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) }
 }
 
 function toTicket(ticket) {
@@ -39,7 +39,7 @@ function useUserQueue() {
   const [lastOutcome, setLastOutcome] = useState('')
   const [queueError, setQueueError] = useState('')
   const [history, setHistory] = useState([]);
-  const [notifications, setNotifications] = useState(initialNotifications)
+  const [notifications, setNotifications] = useState([])
   const [pickedPlaceId, setPickedPlaceId] = useState('') // place chosen on Home before opening Join a queue
   const activeTicketId = ticket?.id
   const service = ticket ? services.find((s) => s.id === ticket.serviceId) : null
@@ -66,6 +66,17 @@ function useUserQueue() {
     setTicket(toTicket(current.ticket))
     setLastOutcome(current.ticket ? '' : current.recent?.status || '')
     await loadHistory()
+    await loadNotifications()
+  }
+
+  // Notifications are created by the backend (joined, next in line, served...)
+  async function loadNotifications() {
+    try {
+      const result = await api.getMyNotifications()
+      setNotifications(result.notifications.map(toNotification))
+    } catch {
+      // keep what is already on screen if notifications cannot be loaded
+    }
   }
 
   // Adds a place by its join code. Returns true when it worked.
@@ -88,12 +99,8 @@ function useUserQueue() {
     await loadPlaces()
   }
 
-  // type: 'Queue update' or 'Status change'
-  function notify(type, message) {
-    setNotifications((current) => [{ id: Date.now(), type, message, time: timeNow(), read: false }, ...current])
-  }
-
   function markAsRead(id) {
+    api.markNotificationRead(id).catch(() => {})
     setNotifications((current) => current.map((n) => (n.id === id ? { ...n, read: true } : n)))
   }
 
@@ -106,8 +113,7 @@ function useUserQueue() {
     setServices((current) => current.map((service) => (
       service.id === result.ticket.serviceId ? { ...service, ...result.ticket.service } : service
     )))
-    const newPlace = places.find((p) => p.id === newService.placeId)
-    notify('Queue update', `You joined ${newService.name} at ${newPlace.name}. You are ${ordinal(result.ticket.position)} in line.`)
+    loadNotifications()
   }
 
   async function leave() {
@@ -120,7 +126,7 @@ function useUserQueue() {
       throw error
     }
     loadHistory()
-    notify('Queue update', `You left the queue for ${service.name}.`)
+    loadNotifications()
     setTicket(null)
     setLastOutcome('left')
   }
@@ -136,6 +142,7 @@ function useUserQueue() {
         const result = await api.getMyQueueTicket()
         if (!active) return
         setQueueError('')
+        loadNotifications()
         if (result.ticket) {
           const updated = toTicket(result.ticket)
           setTicket(updated)
@@ -146,9 +153,6 @@ function useUserQueue() {
           setTicket(null)
           setLastOutcome(result.recent?.status || 'inactive')
           loadHistory()
-          if (result.recent?.status === 'served') notify('Status change', `You have been served at ${result.recent.service?.name || 'the service'}.`)
-          else if (result.recent?.status === 'no-show') notify('Status change', 'Your ticket was marked as a no-show.')
-          else if (result.recent?.status === 'removed') notify('Status change', 'Your ticket was removed from the queue.')
         }
       } catch (error) {
         if (!active) return

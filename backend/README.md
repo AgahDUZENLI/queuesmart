@@ -29,6 +29,7 @@ Demo user logins (all use password `demo-pass-123`): `user@queuesmart.test`, `us
 | `src/places.js` | Places, join codes and users' saved places |
 | `src/services.js` | Service management routes |
 | `src/queues.js` | Queue tickets, priority ordering, serving and wait estimates |
+| `src/notifications.js` | Notifications sent to users about their tickets |
 
 ## Auth API
 
@@ -107,6 +108,15 @@ History is built from the same queue tickets, so nothing extra is stored. Each i
 | GET | `/api/history/stats` | admin | | `200 { total, waiting, serving, served, left, removed, noShow, averageWaitMinutes }` | admin History tab |
 
 `status` must be one of `waiting`, `serving`, `served`, `left`, `removed`, `no-show`; anything else returns 400.
+
+## Notifications API
+
+Created automatically by the queue routes: when a user joins or leaves, when they become first in line ("You are next", sent once per ticket), when they are called, served, marked a no-show, or removed by staff. Nothing is emailed; the front end shows them on the user's Home page.
+
+| Method | Path | Who | Returns |
+|---|---|---|---|
+| GET | `/api/notifications/me` | signed in | `200 { notifications }`, newest first: `{ id, type, message, createdAt, read }` |
+| POST | `/api/notifications/:id/read` | signed in (owner) | `200 { notification }`, or `404` |
 
 ## Adding a module
 
