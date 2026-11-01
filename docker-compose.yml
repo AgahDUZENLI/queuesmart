@@ -20,3 +20,27 @@ services:
       - /app/node_modules
     environment:
       - PORT=4000
+      - DATABASE_URL=postgres://queuesmart:queuesmart@db:5432/queuesmart
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=queuesmart
+      - POSTGRES_PASSWORD=queuesmart
+      - POSTGRES_DB=queuesmart
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U queuesmart -d queuesmart"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-data:

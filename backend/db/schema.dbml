@@ -1,0 +1,139 @@
+Enum user_role {
+  user
+  admin
+}
+
+Enum priority_level {
+  Low
+  Normal
+  High
+}
+
+Enum queue_status {
+  Open
+  Paused
+  Closed
+}
+
+Enum entry_status {
+  waiting
+  serving
+  served
+  left
+  removed
+  "no-show"
+}
+
+Enum notification_type {
+  "Queue update"
+  "Status change"
+}
+
+Enum notification_status {
+  sent
+  viewed
+}
+
+// ---------- Required tables ----------
+
+Table user_credentials {
+  id integer [pk, note: '6-digit id from the app']
+  email varchar(254) [not null, unique]
+  password_hash varchar(255) [not null, note: 'scrypt salt:hash']
+  role user_role [not null, default: 'user']
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table user_profile {
+  user_id integer [pk, ref: - user_credentials.id]
+  email varchar(254) [not null, unique]
+  first_name varchar(50) [not null]
+  last_name varchar(50) [not null]
+  phone varchar(20)
+  email_me boolean [not null, default: true, note: 'preference']
+  place_id integer [ref: > place.id, note: 'admins only: the place they run']
+}
+
+Table service {
+  id integer [pk]
+  place_id integer [not null, ref: > place.id]
+  name varchar(100) [not null]
+  description varchar(500) [not null]
+  duration integer [not null, note: 'minutes, 1 to 480']
+  priority priority_level [not null]
+  max_in_line integer [not null, default: 25, note: '1 to 500']
+  opens time [not null, default: '09:00']
+  closes time [not null, default: '16:30']
+  appointments boolean [not null, default: false]
+  deleted_at timestamptz [note: 'keeps ticket history after a delete']
+
+  indexes {
+    place_id
+  }
+}
+
+Table queue {
+  id integer [pk]
+  service_id integer [not null, unique, ref: - service.id]
+  status queue_status [not null, default: 'Closed']
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table queue_entry {
+  id integer [pk]
+  queue_id integer [not null, ref: > queue.id]
+  user_id integer [not null, ref: > user_credentials.id]
+  ticket varchar(12) [not null, note: 'e.g. A-001']
+  service_name varchar(100) [not null, note: 'name at time of joining']
+  priority priority_level [not null, default: 'Normal']
+  position integer [not null, note: 'queueOrder in the code']
+  status entry_status [not null, default: 'waiting']
+  joined_at timestamptz [not null, default: `now()`]
+  started_at timestamptz
+  completed_at timestamptz
+  close_notified boolean [not null, default: false]
+
+  indexes {
+    (queue_id, status)
+    (user_id, status)
+  }
+}
+
+Table notification {
+  id integer [pk]
+  user_id integer [not null, ref: > user_credentials.id]
+  type notification_type [not null]
+  message varchar(255) [not null]
+  status notification_status [not null, default: 'sent']
+  emailed boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id
+  }
+}
+
+// ---------- Extra tables the app needs ----------
+
+Table place {
+  id integer [pk, note: '6-digit id, also the join code']
+  name varchar(50) [not null]
+}
+
+Table saved_place {
+  user_id integer [ref: > user_credentials.id]
+  place_id integer [ref: > place.id]
+
+  indexes {
+    (user_id, place_id) [pk]
+  }
+}
+
+Table session {
+  token uuid [pk]
+  user_id integer [not null, ref: > user_credentials.id]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// user_profile.email follows any change to the login email
+Ref: user_profile.email - user_credentials.email [update: cascade]
