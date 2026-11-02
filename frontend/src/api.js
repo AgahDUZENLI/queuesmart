@@ -59,6 +59,15 @@ export function signOut() {
   currentUser = null
 }
 
+export const getProfile = () => request('GET', '/api/profile/me')
+
+// Saves the profile, then updates the name shown in the page header
+export async function updateProfile(profile) {
+  const data = await request('PUT', '/api/profile/me', profile)
+  if (currentUser) currentUser = { ...currentUser, firstName: data.profile.firstName, lastName: data.profile.lastName, emailMe: data.profile.emailMe }
+  return data.profile
+}
+
 export const getSavedPlaces = () => request('GET', '/api/places/saved')
 export const addPlace = (code) => request('POST', '/api/places/saved', { code })
 export const removePlace = (placeId) => request('DELETE', `/api/places/saved/${placeId}`)

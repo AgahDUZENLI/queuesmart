@@ -8,6 +8,7 @@ import UserDashboard from './pages/user/UserDashboard'
 import JoinQueue from './pages/user/JoinQueue'
 import QueueStatus from './pages/user/QueueStatus'
 import UserHistory from './pages/user/UserHistory'
+import UserProfile from './pages/user/UserProfile'
 import useUserQueue from './hooks/useUserQueue'
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
   if (page === 'join-queue') return <JoinQueue goTo={setPage} queue={queue} />
   if (page === 'queue-status') return <QueueStatus goTo={setPage} queue={queue} />
   if (page === 'user-history') return <UserHistory goTo={setPage} queue={queue} />
+  if (page === 'user-profile') return <UserProfile goTo={setPage} queue={queue} />
   if (page === 'admin-sign-in') return <AdminSignIn goTo={setPage} />
   if (page === 'admin-create-account') return <AdminCreateAccount goTo={setPage} />
   if (page.startsWith('admin-')) return <AdminWorkspace goTo={setPage} initialPage={page.slice(6)} />

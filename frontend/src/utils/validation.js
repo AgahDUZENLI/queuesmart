@@ -26,6 +26,15 @@ export function checkPassword(value) {
   return ''
 }
 
+// Phone is optional. Digits, spaces and + ( ) - . only, at least 7 digits, at most 20 characters.
+export function checkPhone(value) {
+  const phone = value.trim()
+  if (phone === '') return ''
+  if (phone.length > 20) return 'Phone must be 20 characters or less.'
+  if (!/^\+?[0-9 ()\-.]+$/.test(phone) || phone.replace(/\D/g, '').length < 7) return 'Enter a valid phone number, like 555-123-4567.'
+  return ''
+}
+
 // True when at least one field has an error message
 export function hasErrors(errors) {
   return Object.values(errors).some((message) => message !== '')

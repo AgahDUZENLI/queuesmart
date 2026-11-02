@@ -1,6 +1,7 @@
 const express = require('express')
 const cors = require('cors')
 const auth = require('./auth')
+const profile = require('./profile')
 const places = require('./places')
 const services = require('./services')
 const queues = require('./queues')
@@ -15,6 +16,7 @@ function createApp() {
 
 
   app.use('/api/auth', auth.router)
+  app.use('/api/profile', profile.router)
   app.use('/api/places', places.router)
   app.use('/api/services', services.router)
   app.use('/api/queues', queues.router)

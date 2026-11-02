@@ -12,10 +12,12 @@
   "type": "commonjs",
   "dependencies": {
     "cors": "^2.8.6",
-    "express": "^5.3.0"
+    "express": "^5.3.0",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "jest": "^30.5.2",
+    "pg-mem": "^3.0.14",
     "supertest": "^7.3.1"
   },
   "private": true,
@@ -24,6 +26,9 @@
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/server.js"
+    ],
+    "setupFilesAfterEnv": [
+      "./tests/setup.js"
     ]
   }
 }
