@@ -43,6 +43,19 @@ function checkTime(value, label) {
   return ''
 }
 
+// Phone is optional: empty is fine. Otherwise only digits, spaces and + ( ) - . are allowed,
+// with at least 7 digits and at most 20 characters (the database column is varchar(20)).
+function checkPhone(value) {
+  if (value === undefined || value === null || value === '') return ''
+  if (typeof value !== 'string') return 'Phone must be text.'
+  const phone = value.trim()
+  if (phone === '') return ''
+  if (phone.length > 20) return 'Phone must be 20 characters or less.'
+  const digits = phone.replace(/\D/g, '')
+  if (!/^\+?[0-9 ()\-.]+$/.test(phone) || digits.length < 7) return 'Enter a valid phone number, like 555-123-4567.'
+  return ''
+}
+
 function checkTrueFalse(value, label) {
   if (typeof value !== 'boolean') return `${label} must be true or false.`
   return ''
@@ -71,6 +84,7 @@ module.exports = {
   checkWholeNumber,
   checkOneOf,
   checkTime,
+  checkPhone,
   checkTrueFalse,
   checkJoinCode,
   findErrors,

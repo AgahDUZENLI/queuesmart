@@ -1,8 +1,8 @@
 // Demo data loaded when the server starts, so the UI can be tried right away.
 // Matches the sample places and services in the front end.
 
-const { data } = require('./data')
 const { createUser } = require('./auth')
+const users = require('./userRepo')
 const { addService } = require('./services')
 
 const hours = { opens: '09:00', closes: '16:30' }
@@ -13,26 +13,32 @@ const DEMO_USERS = [
   { firstName: 'Sam', lastName: 'Carter', email: 'user4@queuesmart.test' },
 ]
 
-function addAdmin(firstName, placeName, email, code) {
-  const admin = createUser({ role: 'admin', firstName, lastName: 'Admin', placeName, email, password: 'demo-pass-123' })
-  // Swap the random code for a fixed one so the demo is easy to try
-  const place = data.places.find((p) => p.id === admin.placeId)
-  place.id = code
-  admin.placeId = code
-  return place
+// Admins get a fixed join code so the demo is easy to try
+function addAdmin(firstName, placeName, email, placeId) {
+  return createUser({ role: 'admin', firstName, lastName: 'Admin', placeName, email, password: 'demo-pass-123', placeId })
 }
 
-function loadDemoData() {
-  const campus = addAdmin('Demo', 'Student Services Center', 'admin@queuesmart.test', 123456)
-  addAdmin('Tia', 'Main Street Tire Shop', 'tires@queuesmart.test', 234567)
-  addAdmin('Cal', 'Eastside Health Clinic', 'clinic@queuesmart.test', 345678)
+// The database keeps accounts between restarts, so they are only created once.
+// Services are still in memory (until they move to the database), so they load every time.
+async function loadDemoAccounts() {
+  const existing = await users.findByEmail('admin@queuesmart.test')
+  if (existing) return existing
+
+  const campus = await addAdmin('Demo', 'Student Services Center', 'admin@queuesmart.test', 123456)
+  await addAdmin('Tia', 'Main Street Tire Shop', 'tires@queuesmart.test', 234567)
+  await addAdmin('Cal', 'Eastside Health Clinic', 'clinic@queuesmart.test', 345678)
 
   for (const account of DEMO_USERS) {
-    const user = createUser({ role: 'user', ...account, password: 'demo-pass-123' })
-    user.savedPlaceIds.push(campus.id)
+    const user = await createUser({ role: 'user', ...account, password: 'demo-pass-123' })
+    await users.savePlace(user.id, campus.placeId)
   }
+  return campus
+}
 
-  const atCampus = { placeId: campus.id, ...hours }
+async function loadDemoData() {
+  const campus = await loadDemoAccounts()
+
+  const atCampus = { placeId: campus.placeId, ...hours }
   addService({
     name: 'Academic Advising',
     description: 'Meet with an advisor about course planning and academic goals.',

@@ -7,6 +7,7 @@ const links = [
   { page: 'join-queue', label: 'Join a queue' },
   { page: 'queue-status', label: 'Queue status' },
   { page: 'user-history', label: 'History' },
+  { page: 'user-profile', label: 'Profile' },
 ]
 
 function UserLayout({ title, subtitle, active, goTo, queue, children }) {
