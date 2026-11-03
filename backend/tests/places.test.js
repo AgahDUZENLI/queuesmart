@@ -1,6 +1,6 @@
 const request = require('supertest')
 const { createApp } = require('../src/app')
-const { data, reset } = require('../src/data')
+const db = require('../src/db')
 
 let app
 let adminAuth
@@ -8,7 +8,6 @@ let userAuth
 let code
 
 beforeEach(async () => {
-  reset()
   app = createApp()
 
   const admin = await request(app).post('/api/auth/register').send({
@@ -19,7 +18,7 @@ beforeEach(async () => {
   })
   adminAuth = { Authorization: `Bearer ${admin.body.token}` }
   userAuth = { Authorization: `Bearer ${user.body.token}` }
-  code = data.places[0].id // the place id is its join code
+  code = admin.body.user.placeId
 
   await request(app).post('/api/services').set(adminAuth).send({
     name: 'Walk-in help', description: 'Quick questions.', duration: 10, priority: 'Normal',
@@ -34,7 +33,8 @@ test('join codes are unique 6-digit numbers', async () => {
       role: 'admin', firstName: 'A', lastName: 'B', placeName: `Place ${i}`, email: `a${i}@example.edu`, password: 'correct-horse',
     })
   }
-  const codes = data.places.map((p) => p.id)
+  const { rows } = await db.query('SELECT id FROM place')
+  const codes = rows.map((place) => place.id)
   expect(new Set(codes).size).toBe(codes.length)
   codes.forEach((c) => expect(String(c)).toMatch(/^\d{6}$/))
 })

@@ -27,6 +27,7 @@ function createApp() {
   // Bad JSON bodies (status 400) and unexpected errors (500)
   app.use((err, req, res, next) => {
     const status = err.status || 500
+    if (status === 500) console.error(err)
     res.status(status).json({ error: status === 500 ? 'Something went wrong.' : 'Request body must be valid JSON.' })
   })
 

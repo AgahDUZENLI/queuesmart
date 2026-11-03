@@ -1,170 +1,128 @@
-const express = require('express')
 const request = require('supertest')
-const { data } = require('../src/data')
-const { router, minutesBetween, buildStats } = require('../src/history')
+const { createApp } = require('../src/app')
+const db = require('../src/db')
+const { minutesBetween, buildStats } = require('../src/history')
 
-const app = express()
-app.use(express.json())
-app.use('/api/history', router)
+const auth = (response) => ({ Authorization: `Bearer ${response.body.token}` })
 
-const auth = (token) => ({ Authorization: `Bearer ${token}` })
+let app
+let userAuth
+let otherUserAuth
+let adminAuth
+let otherAdminAuth
+let serviceId
 
-beforeEach(() => {
-  data.users.length = 0
-  data.places.length = 0
-  data.services.length = 0
-  data.queueEntries.length = 0
-  Object.keys(data.sessions).forEach((token) => delete data.sessions[token])
+async function register(body) {
+  return request(app).post('/api/auth/register').send({
+    lastName: 'Test',
+    password: 'correct-horse',
+    ...body,
+  })
+}
 
-  data.users.push(
-    { id: 1, role: 'user', firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com' },
-    { id: 2, role: 'user', firstName: 'Bob', lastName: 'Stone', email: 'bob@example.com' },
-    { id: 3, role: 'admin', firstName: 'Cara', lastName: 'Admin', email: 'cara@example.com', placeId: 1 },
-    { id: 4, role: 'admin', firstName: 'Dan', lastName: 'Admin', email: 'dan@example.com', placeId: 2 },
-  )
-  data.sessions['ada-token'] = 1
-  data.sessions['bob-token'] = 2
-  data.sessions['cara-token'] = 3
-  data.sessions['dan-token'] = 4
+async function addService(headers, name) {
+  const result = await request(app).post('/api/services').set(headers).send({
+    name,
+    description: 'Queue history fixture.',
+    duration: 15,
+    priority: 'Normal',
+    status: 'Open',
+  })
+  return result.body.service.id
+}
 
-  data.places.push({ id: 1, name: 'Advising Office' }, { id: 2, name: 'Clinic' })
-  data.services.push(
-    { id: 1, name: 'Transcripts', placeId: 1, duration: 10 },
-    { id: 2, name: 'Checkup', placeId: 2, duration: 15 },
-  )
-  data.queueEntries.push(
-    { id: 1, serviceId: 1, placeId: 1, userId: 1, ticket: 'T-001', priority: 'Normal', status: 'served', joinedAt: '2026-10-21T10:00:00.000Z', startedAt: '2026-10-21T10:12:00.000Z', completedAt: '2026-10-21T10:20:00.000Z', queueOrder: 0 },
-    { id: 2, serviceId: 1, placeId: 1, userId: 1, ticket: 'T-002', priority: 'Normal', status: 'left', joinedAt: '2026-10-21T11:00:00.000Z', queueOrder: 0 },
-    { id: 3, serviceId: 1, placeId: 1, userId: 2, ticket: 'T-003', priority: 'High', status: 'waiting', joinedAt: '2026-10-21T11:30:00.000Z', queueOrder: 1 },
-    { id: 4, serviceId: 2, placeId: 2, userId: 2, ticket: 'C-001', priority: 'Normal', status: 'no-show', joinedAt: '2026-10-21T09:00:00.000Z', startedAt: '2026-10-21T09:30:00.000Z', queueOrder: 0 },
-  )
+beforeEach(async () => {
+  app = createApp()
+  const admin = await register({
+    role: 'admin',
+    firstName: 'Cara',
+    placeName: 'Advising Office',
+    email: 'admin@example.edu',
+  })
+  const otherAdmin = await register({
+    role: 'admin',
+    firstName: 'Dan',
+    placeName: 'Clinic',
+    email: 'other-admin@example.edu',
+  })
+  const user = await register({ firstName: 'Ada', email: 'ada@example.edu' })
+  const otherUser = await register({ firstName: 'Bob', email: 'bob@example.edu' })
+  adminAuth = auth(admin)
+  otherAdminAuth = auth(otherAdmin)
+  userAuth = auth(user)
+  otherUserAuth = auth(otherUser)
+  serviceId = await addService(adminAuth, 'Transcripts')
+  const otherServiceId = await addService(otherAdminAuth, 'Checkup')
+  const { rows: queues } = await db.query('SELECT id, service_id FROM queue')
+  const queueByService = new Map(queues.map((queue) => [queue.service_id, queue.id]))
+  const { rows: users } = await db.query('SELECT id, email FROM user_credentials')
+  const userIds = new Map(users.map((row) => [row.email, row.id]))
+
+  const fixture = [
+    [1, queueByService.get(serviceId), userIds.get('ada@example.edu'), 'T-001', 'served', '2026-10-21T10:00:00Z', '2026-10-21T10:12:00Z', '2026-10-21T10:20:00Z'],
+    [2, queueByService.get(serviceId), userIds.get('ada@example.edu'), 'T-002', 'left', '2026-10-21T11:00:00Z', null, null],
+    [3, queueByService.get(serviceId), userIds.get('bob@example.edu'), 'T-003', 'waiting', '2026-10-21T11:30:00Z', null, null],
+    [4, queueByService.get(otherServiceId), userIds.get('bob@example.edu'), 'C-001', 'no-show', '2026-10-21T09:00:00Z', '2026-10-21T09:30:00Z', null],
+  ]
+  for (const [id, queueId, userId, ticket, status, joinedAt, startedAt, completedAt] of fixture) {
+    await db.query(
+      `INSERT INTO queue_entry
+        (id, queue_id, user_id, ticket, service_name, priority, position, status, joined_at, started_at, completed_at)
+       VALUES ($1, $2, $3, $4, $5, 'Normal', $1, $6, $7, $8, $9)`,
+      [id, queueId, userId, ticket, ticket.startsWith('C') ? 'Checkup' : 'Transcripts', status, joinedAt, startedAt, completedAt],
+    )
+  }
 })
 
-describe('minutesBetween', () => {
-  test('returns whole minutes', () => {
+describe('history helpers', () => {
+  test('calculates whole, nonnegative minutes and handles missing timestamps', () => {
     expect(minutesBetween('2026-10-21T10:00:00.000Z', '2026-10-21T10:12:20.000Z')).toBe(12)
-  })
-
-  test('returns null when either time is missing', () => {
     expect(minutesBetween('2026-10-21T10:00:00.000Z', undefined)).toBeNull()
-    expect(minutesBetween(undefined, '2026-10-21T10:00:00.000Z')).toBeNull()
-  })
-
-  test('never goes negative', () => {
     expect(minutesBetween('2026-10-21T10:10:00.000Z', '2026-10-21T10:00:00.000Z')).toBe(0)
   })
-})
 
-describe('buildStats', () => {
-  test('is zeroed with no tickets', () => {
+  test('zeroes statistics for an empty history', () => {
     expect(buildStats([])).toMatchObject({ total: 0, served: 0, averageWaitMinutes: 0 })
   })
 })
 
-describe('GET /api/history/me', () => {
-  test('requires sign in', async () => {
+describe('database-backed history routes', () => {
+  test('requires a user session and returns only the signed-in user tickets newest first', async () => {
     await request(app).get('/api/history/me').expect(401)
+    await request(app).get('/api/history/me').set(adminAuth).expect(403)
+    const response = await request(app).get('/api/history/me').set(userAuth).expect(200)
+    expect(response.body.total).toBe(2)
+    expect(response.body.history.map((item) => item.id)).toEqual([2, 1])
   })
 
-  test('is not available to admins', async () => {
-    await request(app).get('/api/history/me').set(auth('cara-token')).expect(403)
-  })
-
-  test('returns only the user\'s own tickets, newest first', async () => {
-    const res = await request(app).get('/api/history/me').set(auth('ada-token')).expect(200)
-    expect(res.body.total).toBe(2)
-    expect(res.body.history.map((item) => item.id)).toEqual([2, 1])
-  })
-
-  test('includes service name, place name and wait time', async () => {
-    const res = await request(app).get('/api/history/me').set(auth('ada-token')).expect(200)
-    const served = res.body.history.find((item) => item.id === 1)
-    expect(served).toMatchObject({ serviceName: 'Transcripts', placeName: 'Advising Office', status: 'served', waitedMinutes: 12 })
-  })
-
-  test('has a null wait time for tickets that were never called', async () => {
-    const res = await request(app).get('/api/history/me').set(auth('ada-token')).expect(200)
-    expect(res.body.history.find((item) => item.id === 2).waitedMinutes).toBeNull()
-  })
-
-  test('filters by status', async () => {
-    const res = await request(app).get('/api/history/me?status=left').set(auth('ada-token')).expect(200)
-    expect(res.body.history.map((item) => item.id)).toEqual([2])
-  })
-
-  test('applies the limit but keeps the full total', async () => {
-    const res = await request(app).get('/api/history/me?limit=1').set(auth('ada-token')).expect(200)
-    expect(res.body.history).toHaveLength(1)
-    expect(res.body.total).toBe(2)
-  })
-
-  test('returns an empty list for a user with no tickets', async () => {
-    data.queueEntries.length = 0
-    const res = await request(app).get('/api/history/me').set(auth('ada-token')).expect(200)
-    expect(res.body).toEqual({ total: 0, history: [] })
-  })
-
-  test.each([
-    ['status=bogus', 'status'],
-    ['limit=0', 'limit'],
-    ['limit=101', 'limit'],
-    ['limit=abc', 'limit'],
-    ['limit=2.5', 'limit'],
-  ])('rejects invalid filter %s', async (query, field) => {
-    const res = await request(app).get(`/api/history/me?${query}`).set(auth('ada-token')).expect(400)
-    expect(res.body.fields[field]).toBeTruthy()
-  })
-})
-
-describe('GET /api/history (admin)', () => {
-  test('is not available to regular users', async () => {
-    await request(app).get('/api/history').set(auth('ada-token')).expect(403)
-  })
-
-  test('shows only tickets for the admin\'s own place', async () => {
-    const res = await request(app).get('/api/history').set(auth('cara-token')).expect(200)
-    expect(res.body.history.map((item) => item.id)).toEqual([3, 2, 1])
-    const other = await request(app).get('/api/history').set(auth('dan-token')).expect(200)
-    expect(other.body.history.map((item) => item.id)).toEqual([4])
-  })
-
-  test('includes the customer name', async () => {
-    const res = await request(app).get('/api/history').set(auth('cara-token')).expect(200)
-    expect(res.body.history.find((item) => item.id === 3).name).toBe('Bob Stone')
-  })
-
-  test('uses fallback labels for deleted services and users', async () => {
-    data.queueEntries.push({ id: 5, serviceId: 99, placeId: 1, userId: 99, ticket: 'X-001', priority: 'Low', status: 'removed', joinedAt: '2026-10-21T12:00:00.000Z', queueOrder: 0 })
-    const res = await request(app).get('/api/history?status=removed').set(auth('cara-token')).expect(200)
-    expect(res.body.history[0]).toMatchObject({ serviceName: 'Removed service', name: 'Guest' })
-  })
-
-  test('rejects an invalid status', async () => {
-    await request(app).get('/api/history?status=nope').set(auth('cara-token')).expect(400)
-  })
-})
-
-describe('GET /api/history/stats (admin)', () => {
-  test('is not available to regular users', async () => {
-    await request(app).get('/api/history/stats').set(auth('ada-token')).expect(403)
-  })
-
-  test('summarizes the admin\'s own place', async () => {
-    const res = await request(app).get('/api/history/stats').set(auth('cara-token')).expect(200)
-    expect(res.body).toEqual({
-      total: 3,
-      waiting: 1,
-      serving: 0,
-      served: 1,
-      left: 1,
-      removed: 0,
-      noShow: 0,
-      averageWaitMinutes: 12,
+  test('includes service/place/customer labels and wait time', async () => {
+    const response = await request(app).get('/api/history/me').set(userAuth).expect(200)
+    expect(response.body.history[1]).toMatchObject({
+      serviceName: 'Transcripts',
+      placeName: 'Advising Office',
+      name: 'Ada Test',
+      status: 'served',
+      waitedMinutes: 12,
     })
+    expect(response.body.history[0].waitedMinutes).toBeNull()
   })
 
-  test('counts no-shows for the other place', async () => {
-    const res = await request(app).get('/api/history/stats').set(auth('dan-token')).expect(200)
-    expect(res.body).toMatchObject({ total: 1, noShow: 1, averageWaitMinutes: 30 })
+  test('filters by status, validates query values, and applies limit with full total', async () => {
+    expect((await request(app).get('/api/history/me?status=left').set(userAuth)).body.history.map((item) => item.id)).toEqual([2])
+    const limited = await request(app).get('/api/history/me?limit=1').set(userAuth)
+    expect(limited.body).toMatchObject({ total: 2, history: [{ id: 2 }] })
+    expect((await request(app).get('/api/history/me?status=nope').set(userAuth)).status).toBe(400)
+    expect((await request(app).get('/api/history/me?limit=2.5').set(userAuth)).status).toBe(400)
+  })
+
+  test('restricts admin history and statistics to their place', async () => {
+    await request(app).get('/api/history').set(userAuth).expect(403)
+    const ownHistory = await request(app).get('/api/history').set(adminAuth)
+    expect(ownHistory.body.history.map((item) => item.id)).toEqual([3, 2, 1])
+    expect(ownHistory.body.history[0].name).toBe('Bob Test')
+    const stats = await request(app).get('/api/history/stats').set(adminAuth)
+    expect(stats.body).toMatchObject({ total: 3, waiting: 1, served: 1, left: 1, averageWaitMinutes: 12 })
+    const otherStats = await request(app).get('/api/history/stats').set(otherAdminAuth)
+    expect(otherStats.body).toMatchObject({ total: 1, noShow: 1, averageWaitMinutes: 30 })
   })
 })

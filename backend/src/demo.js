@@ -3,7 +3,7 @@
 
 const { createUser } = require('./auth')
 const users = require('./userRepo')
-const { addService } = require('./services')
+const services = require('./serviceRepo')
 
 const hours = { opens: '09:00', closes: '16:30' }
 const DEMO_USERS = [
@@ -19,7 +19,6 @@ function addAdmin(firstName, placeName, email, placeId) {
 }
 
 // The database keeps accounts between restarts, so they are only created once.
-// Services are still in memory (until they move to the database), so they load every time.
 async function loadDemoAccounts() {
   const existing = await users.findByEmail('admin@queuesmart.test')
   if (existing) return existing
@@ -39,36 +38,37 @@ async function loadDemoData() {
   const campus = await loadDemoAccounts()
 
   const atCampus = { placeId: campus.placeId, ...hours }
-  addService({
+  const demoServices = [{
     name: 'Academic Advising',
     description: 'Meet with an advisor about course planning and academic goals.',
     duration: 15, priority: 'Normal', maxInLine: 40, status: 'Open', appointments: true, ...atCampus,
-  })
-  addService({
+  }, {
     name: 'Financial Aid',
     description: 'Get help with financial aid applications and awards.',
     duration: 20, priority: 'Normal', maxInLine: 35, status: 'Open', appointments: true, ...atCampus,
-  })
-  addService({
+  }, {
     name: 'Registrar',
     description: 'Support for records, transcripts, and enrollment.',
     duration: 10, priority: 'Normal', maxInLine: 30, status: 'Open', appointments: false, ...atCampus,
-  })
-  addService({
+  }, {
     name: 'Counseling Intake',
     description: 'Start a confidential conversation with Counseling Services.',
     duration: 30, priority: 'High', maxInLine: 20, status: 'Open', appointments: true, ...atCampus,
-  })
-  addService({
+  }, {
     name: 'IT Help Desk',
     description: 'Troubleshoot account, device, and campus technology issues.',
     duration: 12, priority: 'Normal', maxInLine: 25, status: 'Paused', appointments: false, ...atCampus,
-  })
-  addService({
+  }, {
     name: 'Career Coaching',
     description: 'Get guidance on resumes, interviews, and career planning.',
     duration: 25, priority: 'Low', maxInLine: 25, status: 'Closed', appointments: true, ...atCampus,
-  })
+  }]
+  const existing = await services.listByPlace(campus.placeId)
+  for (const service of demoServices) {
+    if (!existing.some((candidate) => candidate.name === service.name)) {
+      await services.create(service)
+    }
+  }
 }
 
 module.exports = { loadDemoData }

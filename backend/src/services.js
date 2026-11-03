@@ -3,8 +3,9 @@
 // who runs the place can create, update or delete its services.
 
 const express = require('express')
-const { data, newId } = require('./data')
-const { queueSummary, byServicePriority, PRIORITIES } = require('./queues')
+const serviceRepo = require('./serviceRepo')
+const queueRepo = require('./queueRepo')
+const { PRIORITIES } = require('./queues')
 const { requireAuth, requireAdmin } = require('./auth')
 const { checkText, checkWholeNumber, checkOneOf, checkTime, checkTrueFalse, findErrors } = require('./validation')
 
@@ -48,82 +49,67 @@ function trimText(service) {
   return service
 }
 
-function addService(fields) {
-  const service = trimText({ id: newId(data.services), ...fields })
-  data.services.push(service)
-  return service
-}
-
-function findService(id) {
-  return data.services.find((service) => service.id === Number(id))
-}
-
-// For admin routes: returns the service if it belongs to this admin's place.
-// Otherwise sends a 404 or 403 and returns null.
-function findOwnService(req, res) {
-  const service = findService(req.params.id)
-  if (!service) {
-    res.status(404).json({ error: 'Service not found.' })
-    return null
-  }
-  if (service.placeId !== req.user.placeId) {
-    res.status(403).json({ error: 'You can only change services at your own place.' })
-    return null
-  }
-  return service
-}
-
 const router = express.Router()
 
 // GET /api/services, or /api/services?placeId=1 for one place's services.
 // High-priority services come first.
-router.get('/', (req, res) => {
-  const placeId = Number(req.query.placeId)
-  const listed = req.query.placeId ? data.services.filter((s) => s.placeId === placeId) : [...data.services]
-  const services = listed.sort(byServicePriority).map((service) => ({ ...service, ...queueSummary(service) }))
-  res.json({ services })
+router.get('/', async (req, res) => {
+  const listed = req.query.placeId
+    ? await serviceRepo.listByPlace(Number(req.query.placeId))
+    : await serviceRepo.listAll()
+  const withSummaries = await Promise.all(listed.map(async (service) => ({
+    ...service,
+    ...await queueRepo.summary(service, (await queueRepo.serviceContext(service.id)).queueId),
+  })))
+  res.json({ services: await queueRepo.orderByPriorityAndWait(withSummaries) })
 })
 
 // GET /api/services/:id
-router.get('/:id', (req, res) => {
-  const service = findService(req.params.id)
+router.get('/:id', async (req, res) => {
+  const service = await serviceRepo.findById(req.params.id)
   if (!service) return res.status(404).json({ error: 'Service not found.' })
   res.json({ service })
 })
 
 // POST /api/services  (admin)
 // { name, description, duration, priority, maxInLine?, status?, opens?, closes?, appointments? }
-router.post('/', requireAuth, requireAdmin, (req, res) => {
+router.post('/', requireAuth, requireAdmin, async (req, res) => {
   const fields = { ...DEFAULTS, ...pickServiceFields(req.body || {}) }
   const errors = validateService(fields)
   if (errors) return res.status(400).json({ error: 'Validation failed.', fields: errors })
 
-  res.status(201).json({ service: addService({ placeId: req.user.placeId, ...fields }) })
+  res.status(201).json({ service: await serviceRepo.create(trimText({ placeId: req.user.placeId, ...fields })) })
 })
 
 // PUT /api/services/:id  (admin) - send only the fields that change
-router.put('/:id', requireAuth, requireAdmin, (req, res) => {
-  const service = findOwnService(req, res)
-  if (!service) return
+router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
+  const service = await serviceRepo.findById(req.params.id)
+  if (!service) return res.status(404).json({ error: 'Service not found.' })
+  if (service.placeId !== req.user.placeId) {
+    return res.status(403).json({ error: 'You can only change services at your own place.' })
+  }
 
   const updated = { ...service, ...pickServiceFields(req.body || {}) }
   const errors = validateService(updated)
   if (errors) return res.status(400).json({ error: 'Validation failed.', fields: errors })
 
-  Object.assign(service, trimText(updated))
-  res.json({ service })
+  const changes = pickServiceFields(req.body || {})
+  if (changes.name !== undefined) changes.name = changes.name.trim()
+  if (changes.description !== undefined) changes.description = changes.description.trim()
+  const saved = await serviceRepo.update(req.params.id, req.user.placeId, changes)
+  if (!saved) return res.status(404).json({ error: 'Service not found.' })
+  res.json({ service: saved })
 })
 
 // DELETE /api/services/:id  (admin)
-router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
-  const service = findOwnService(req, res)
-  if (!service) return
-  // Keep the tickets so history survives; anyone still in line is removed from it
-  for (const entry of data.queueEntries) {
-    if (entry.serviceId === service.id && ['waiting', 'serving'].includes(entry.status)) entry.status = 'removed'
+router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
+  const service = await serviceRepo.findById(req.params.id)
+  if (!service) return res.status(404).json({ error: 'Service not found.' })
+  if (service.placeId !== req.user.placeId) {
+    return res.status(403).json({ error: 'You can only change services at your own place.' })
   }
-  data.services = data.services.filter((s) => s.id !== service.id)
+  await serviceRepo.remove(req.params.id, req.user.placeId)
   res.status(204).end()
 })
 
-module.exports = { router, addService, STATUSES }
+module.exports = { router, STATUSES }
