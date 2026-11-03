@@ -1,103 +1,22 @@
-// Queue tickets are kept in memory until the data layer is added in A4.
+// Queue operations backed by the queue and queue_entry tables.
 
 const express = require('express')
-const { data, newId } = require('./data')
+const queueRepo = require('./queueRepo')
+const placeRepo = require('./placeRepo')
 const { requireAuth, requireAdmin } = require('./auth')
 const { addNotification, notifyNextInLine } = require('./notifications')
 const { checkOneOf, checkWholeNumber, findErrors } = require('./validation')
 
-// The one list of priority levels, used for two things:
-// - a service's priority orders the services (High services are listed first)
-// - a ticket's priority orders people inside one queue. Tickets start as Normal;
-//   only an admin can change it 
 const PRIORITIES = ['Low', 'Normal', 'High']
-const PRIORITY_ORDER = { High: 0, Normal: 1, Low: 2 }
 
-// Service priority decides which queues are listed first for staff and users:
-// waited longest comes first; queues with nobody waiting go last, by name.
-function byServicePriority(a, b) {
-  return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
-    || oldestJoinTime(a) - oldestJoinTime(b)
-    || a.name.localeCompare(b.name)
-}
-
-// When the longest-waiting person in this service's line joined, or Infinity if nobody is waiting
-function oldestJoinTime(service) {
-  const times = waitingTickets(service.id).map((entry) => Date.parse(entry.joinedAt))
-  return times.length > 0 ? Math.min(...times) : Infinity
-}
-
-function findService(id) {
-  return data.services.find((service) => service.id === Number(id))
-}
-
-function waitingTickets(serviceId) {
-  return data.queueEntries
-    .filter((entry) => entry.serviceId === Number(serviceId) && entry.status === 'waiting')
-    .sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || a.queueOrder - b.queueOrder || a.id - b.id)
-}
-
-function servingTicket(serviceId) {
-  return data.queueEntries.find((entry) => entry.serviceId === Number(serviceId) && entry.status === 'serving') || null
-}
-
-// How many recent visits the wait estimate learns from
-const RECENT_VISITS = 5
-
-// True when an ISO timestamp falls on today's date (server time)
-function isToday(timestamp) {
-  return new Date(timestamp).toDateString() === new Date().toDateString()
-}
-
-// Only today's visits count, so every morning starts again from the set duration.
-function recentVisitMinutes(serviceId) {
-  return data.queueEntries
-    .filter((entry) => entry.serviceId === Number(serviceId) && entry.status === 'served' && entry.startedAt && entry.completedAt && isToday(entry.completedAt))
-    .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt) || b.id - a.id)
-    .slice(0, RECENT_VISITS)
-    .map((entry) => Math.max(0, Date.parse(entry.completedAt) - Date.parse(entry.startedAt)) / 60000)
-}
-
-// Minutes per person used for wait estimates: the average of today's last 5 served
-// visits. Until a service has 5 visits today, its expected duration fills the missing
-// ones, so a single very short or very long visit can't swing the estimate.
-function minutesPerPerson(service) {
-  const visits = recentVisitMinutes(service.id)
-  const filled = [...visits, ...Array(RECENT_VISITS - visits.length).fill(service.duration)]
-  return filled.reduce((sum, minutes) => sum + minutes, 0) / RECENT_VISITS
-}
-
-function estimateWaitMinutes(service, peopleAhead) {
-  return Math.ceil(Number((minutesPerPerson(service) * Math.max(0, peopleAhead)).toFixed(2)))
-}
-
-// Minutes the person being served still needs: the usual visit length minus the time
-// they've been there so far. Never below 1 while someone is still being served.
-function servingMinutesLeft(service, serving) {
-  if (!serving) return 0
-  const minutesIn = (Date.now() - Date.parse(serving.startedAt)) / 60000
-  return Math.max(1, minutesPerPerson(service) - minutesIn)
-}
-
-// Wait for someone with `waitingAhead` waiting tickets in front of them:
-// what's left of the current visit + a full visit for each person waiting ahead
-function estimateWaitFromNow(service, waitingAhead) {
-  const minutes = servingMinutesLeft(service, servingTicket(service.id)) + minutesPerPerson(service) * Math.max(0, waitingAhead)
-  return Math.ceil(Number(minutes.toFixed(2)))
-}
-
-function queueSummary(service) {
-  const waiting = waitingTickets(service.id)
-  return {
-    waiting: waiting.length,
-    wait: estimateWaitFromNow(service, waiting.length),
-    averageDuration: Math.round(minutesPerPerson(service)), // learned minutes per visit
-    measuredVisits: recentVisitMinutes(service.id).length, // how many of today's visits that average uses (max 5)
-  }
+function ordinal(number) {
+  const lastTwo = number % 100
+  if (lastTwo >= 11 && lastTwo <= 13) return `${number}th`
+  return number + ({ 1: 'st', 2: 'nd', 3: 'rd' }[number % 10] || 'th')
 }
 
 function publicTicket(entry) {
-  const user = data.users.find((candidate) => candidate.id === entry.userId)
+  if (!entry) return null
   return {
     id: entry.id,
     serviceId: entry.serviceId,
@@ -105,256 +24,151 @@ function publicTicket(entry) {
     priority: entry.priority,
     status: entry.status,
     joinedAt: entry.joinedAt,
-    name: user ? `${user.firstName} ${user.lastName}` : 'Guest',
+    name: entry.name,
   }
 }
 
-function currentTicketForUser(userId) {
-  const entry = data.queueEntries.find((candidate) => candidate.userId === userId && ['waiting', 'serving'].includes(candidate.status))
-  if (!entry) return null
-
-  const service = findService(entry.serviceId)
-  if (!service) return null
-
-  const serving = servingTicket(service.id)
-  const queue = waitingTickets(service.id)
-  const position = entry.status === 'serving' ? 0 : queue.findIndex((candidate) => candidate.id === entry.id) + 1
-  const peopleAhead = entry.status === 'serving' ? 0 : position - 1 + (serving ? 1 : 0)
-
+function userTicketPayload(entry) {
   return {
     ...publicTicket(entry),
-    position: entry.status === 'serving' ? 0 : position,
-    peopleAhead,
-    estimatedWaitMinutes: entry.status === 'serving' ? 0 : estimateWaitFromNow(service, position - 1),
-    service: { ...service, ...queueSummary(service) },
+    position: entry.position,
+    peopleAhead: entry.peopleAhead,
+    estimatedWaitMinutes: entry.estimatedWaitMinutes,
+    service: entry.service,
   }
 }
 
-function recentTicketForUser(userId) {
-  const entry = [...data.queueEntries]
-    .reverse()
-    .find((candidate) => candidate.userId === userId && !['waiting', 'serving'].includes(candidate.status))
-  return entry ? { ...publicTicket(entry), service: findService(entry.serviceId) || null } : null
-}
-
-function adminQueueForService(service) {
-  const serving = servingTicket(service.id)
-  const queue = waitingTickets(service.id)
+function adminService(service) {
   return {
     ...service,
-    ...queueSummary(service),
-    queue: queue.map((entry, index) => ({
+    queue: service.queue.map((entry) => ({
       ...publicTicket(entry),
-      waiting: Math.max(0, Math.floor((Date.now() - Date.parse(entry.joinedAt)) / 60000)),
-      position: index + 1,
+      waiting: entry.waiting,
+      position: entry.position,
     })),
-    nowServing: serving
-      ? {
-          ...publicTicket(serving),
-          started: new Date(serving.startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-          minutesIn: Math.max(0, Math.floor((Date.now() - Date.parse(serving.startedAt)) / 60000)),
-          minutesLeft: Math.ceil(servingMinutesLeft(service, serving)),
-        }
-      : null,
+    nowServing: service.nowServing ? {
+      ...publicTicket(service.nowServing),
+      started: service.nowServing.started,
+      minutesIn: service.nowServing.minutesIn,
+      minutesLeft: service.nowServing.minutesLeft,
+    } : null,
   }
 }
 
-// 1 → 1st, 2 → 2nd, 3 → 3rd, 4 → 4th, 11 → 11th, 21 → 21st (same as ordinal in frontend/src/utils/queueRules.js)
-function ordinal(number) {
-  const lastTwo = number % 100
-  if (lastTwo >= 11 && lastTwo <= 13) return `${number}th`
-  return number + ({ 1: 'st', 2: 'nd', 3: 'rd' }[number % 10] || 'th')
-}
-
-// Sends the "you are next" notification when someone has nobody ahead of them
-function notifyIfNext(service) {
-  notifyNextInLine(service, waitingTickets(service.id), servingTicket(service.id))
-}
-
-function reindexQueue(queue) {
-  queue.forEach((entry, index) => { entry.queueOrder = index })
-}
-
-function ownedService(req, res) {
-  const service = findService(req.params.serviceId)
-  if (!service) {
-    res.status(404).json({ error: 'Service not found.' })
-    return null
+async function notifyIfNext(serviceId) {
+  const context = await queueRepo.serviceContext(serviceId)
+  if (!context) return
+  const waiting = await queueRepo.entriesForQueue(context.queueId, 'waiting')
+  const serving = (await queueRepo.entriesForQueue(context.queueId, 'serving'))[0] || null
+  const next = waiting[0]
+  if (!serving && next && !next.closeNotified) {
+    notifyNextInLine(context.service, waiting, serving)
+    await queueRepo.markCloseNotified(next.id)
   }
-  if (service.placeId !== req.user.placeId) {
-    res.status(403).json({ error: 'You can only manage queues at your own place.' })
-    return null
-  }
-  return service
 }
 
-function activeTicket(serviceId, ticketId) {
-  return data.queueEntries.find((entry) => (
-    entry.serviceId === Number(serviceId) &&
-    entry.id === Number(ticketId) &&
-    ['waiting', 'serving'].includes(entry.status)
-  ))
+async function handle(res, operation) {
+  try {
+    return await operation()
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message })
+    throw error
+  }
 }
 
 const router = express.Router()
 
 // GET /api/queues/me - the signed-in user's active ticket and current estimate
-router.get('/me', requireAuth, (req, res) => {
+router.get('/me', requireAuth, (req, res) => handle(res, async () => {
   if (req.user.role !== 'user') return res.status(403).json({ error: 'Only users can view a personal queue ticket.' })
-  const ticket = currentTicketForUser(req.user.id)
-  res.json({ ticket, recent: ticket ? null : recentTicketForUser(req.user.id) })
-})
+  const result = await queueRepo.userTicket(req.user.id)
+  return res.json({
+    ticket: result.ticket ? userTicketPayload(result.ticket) : null,
+    recent: result.recent ? { ...publicTicket(result.recent), service: result.recent.service } : null,
+  })
+}))
 
 // GET /api/queues/mine - all queue state for the signed-in admin's place
-router.get('/mine', requireAuth, requireAdmin, (req, res) => {
-  const services = data.services
-    .filter((service) => service.placeId === req.user.placeId)
-    .sort(byServicePriority)
-    .map(adminQueueForService)
-  const place = data.places.find((candidate) => candidate.id === req.user.placeId)
-  res.json({ place, services })
-})
+router.get('/mine', requireAuth, requireAdmin, (req, res) => handle(res, async () => {
+  const [place, services] = await Promise.all([
+    placeRepo.findById(req.user.placeId),
+    queueRepo.adminQueues(req.user.placeId),
+  ])
+  return res.json({ place, services: services.map(adminService) })
+}))
 
 // POST /api/queues/:serviceId/join - join the end of a service queue
-router.post('/:serviceId/join', requireAuth, (req, res) => {
+router.post('/:serviceId/join', requireAuth, (req, res) => handle(res, async () => {
   if (req.user.role !== 'user') return res.status(403).json({ error: 'Only users can join a queue.' })
-
-  const service = findService(req.params.serviceId)
-  if (!service) return res.status(404).json({ error: 'Service not found.' })
-  if (service.status !== 'Open') return res.status(409).json({ error: `This service is ${service.status.toLowerCase()} and is not accepting new tickets.` })
-
-  const existing = data.queueEntries.find((entry) => entry.userId === req.user.id && ['waiting', 'serving'].includes(entry.status))
-  if (existing) return res.status(409).json({ error: 'You are already in a queue. Leave it before joining another one.' })
-
-  const queue = waitingTickets(service.id)
-  if (queue.length >= service.maxInLine) return res.status(409).json({ error: 'This queue is full.' })
-
-  const queueOrder = Math.max(-1, ...queue.map((entry) => entry.queueOrder)) + 1
-  const nextNumber = data.queueEntries.filter((entry) => entry.serviceId === service.id).length + 1
-  const entry = {
-    id: newId(data.queueEntries),
-    serviceId: service.id,
-    placeId: service.placeId,
-    userId: req.user.id,
-    ticket: `${service.name[0].toUpperCase()}-${String(nextNumber).padStart(3, '0')}`,
-    serviceName: service.name, // kept for history if the service is deleted later
-    priority: 'Normal',
-    status: 'waiting',
-    joinedAt: new Date().toISOString(),
-    queueOrder,
-  }
-  data.queueEntries.push(entry)
-
-  const ticket = currentTicketForUser(req.user.id)
-  addNotification(req.user.id, 'Queue update', `You joined ${service.name}. You are ${ordinal(ticket.position)} in line.`)
-  notifyIfNext(service)
-  res.status(201).json({ ticket })
-})
+  const { ticket } = await queueRepo.join(req.params.serviceId, req.user.id)
+  addNotification(req.user.id, 'Queue update', `You joined ${ticket.service.name}. You are ${ordinal(ticket.position)} in line.`)
+  await notifyIfNext(ticket.serviceId)
+  return res.status(201).json({ ticket: userTicketPayload(ticket) })
+}))
 
 // DELETE /api/queues/tickets/:ticketId - a user leaves, or an admin removes, a ticket
-router.delete('/tickets/:ticketId', requireAuth, (req, res) => {
-  const entry = data.queueEntries.find((candidate) => (
-    candidate.id === Number(req.params.ticketId) && ['waiting', 'serving'].includes(candidate.status)
-  ))
-  if (!entry) return res.status(404).json({ error: 'Active queue ticket not found.' })
-
-  const service = findService(entry.serviceId)
+router.delete('/tickets/:ticketId', requireAuth, (req, res) => handle(res, async () => {
+  const entry = await queueRepo.removeTicket(req.params.ticketId, req.user)
   if (req.user.role === 'user') {
-    if (entry.userId !== req.user.id) return res.status(403).json({ error: 'You can only leave your own queue ticket.' })
-    entry.status = 'left'
     addNotification(entry.userId, 'Queue update', `You left the queue for ${entry.serviceName}.`)
   } else {
-    if (!service || service.placeId !== req.user.placeId) {
-      return res.status(403).json({ error: 'You can only manage queues at your own place.' })
-    }
-    entry.status = 'removed'
     addNotification(entry.userId, 'Status change', 'Your ticket was removed from the queue.')
   }
-
-  if (service) notifyIfNext(service)
-  res.status(204).end()
-})
+  await notifyIfNext(entry.serviceId)
+  return res.status(204).end()
+}))
 
 // PATCH /api/queues/:serviceId/tickets/:ticketId - admins can set priority or position
-router.patch('/:serviceId/tickets/:ticketId', requireAuth, requireAdmin, (req, res) => {
-  const service = ownedService(req, res)
-  if (!service) return
-
-  const entry = activeTicket(service.id, req.params.ticketId)
-  if (!entry || entry.status !== 'waiting') return res.status(404).json({ error: 'Waiting queue ticket not found.' })
+router.patch('/:serviceId/tickets/:ticketId', requireAuth, requireAdmin, (req, res) => handle(res, async () => {
+  const context = await queueRepo.serviceContext(req.params.serviceId)
+  if (!context) return res.status(404).json({ error: 'Service not found.' })
+  if (context.service.placeId !== req.user.placeId) {
+    return res.status(403).json({ error: 'You can only manage queues at your own place.' })
+  }
 
   const body = req.body || {}
+  const waiting = await queueRepo.entriesForQueue(context.queueId, 'waiting')
   const errors = findErrors({
     ...(body.priority !== undefined ? { priority: checkOneOf(body.priority, PRIORITIES, 'Priority') } : {}),
-    ...(body.position !== undefined ? { position: checkWholeNumber(body.position, 'Position', 1, Math.max(1, waitingTickets(service.id).length)) } : {}),
+    ...(body.position !== undefined ? { position: checkWholeNumber(body.position, 'Position', 1, Math.max(1, waiting.length)) } : {}),
   })
   if (body.priority === undefined && body.position === undefined) {
     return res.status(400).json({ error: 'Provide a priority or position to update.' })
   }
   if (errors) return res.status(400).json({ error: 'Validation failed.', fields: errors })
 
-  const nextPriority = body.priority === undefined ? entry.priority : body.priority
-  if (body.position !== undefined) {
-    const queue = waitingTickets(service.id).sort((a, b) => {
-      const aPriority = a.id === entry.id ? nextPriority : a.priority
-      const bPriority = b.id === entry.id ? nextPriority : b.priority
-      return PRIORITY_ORDER[aPriority] - PRIORITY_ORDER[bPriority] || a.queueOrder - b.queueOrder || a.id - b.id
-    })
-    const target = queue[body.position - 1]
-    const targetPriority = target.id === entry.id ? nextPriority : target.priority
-    if (targetPriority !== nextPriority) {
-      return res.status(409).json({ error: 'A ticket can only move within its priority group.' })
-    }
-    const from = queue.findIndex((ticket) => ticket.id === entry.id)
-    queue.splice(from, 1)
-    queue.splice(body.position - 1, 0, entry)
-    entry.priority = nextPriority
-    reindexQueue(queue)
-  } else {
-    entry.priority = nextPriority
-  }
-
-  notifyIfNext(service)
-  res.json({ ticket: publicTicket(entry), queue: adminQueueForService(service).queue })
-})
+  const result = await queueRepo.updateTicket(req.params.serviceId, req.user.placeId, req.params.ticketId, body)
+  await notifyIfNext(req.params.serviceId)
+  return res.json({
+    ticket: publicTicket(result.ticket),
+    queue: result.queue.map((entry, index) => ({ ...publicTicket(entry), position: index + 1 })),
+  })
+}))
 
 // POST /api/queues/:serviceId/next - call the first waiting ticket to service
-router.post('/:serviceId/next', requireAuth, requireAdmin, (req, res) => {
-  const service = ownedService(req, res)
-  if (!service) return
-  if (servingTicket(service.id)) return res.status(409).json({ error: 'Complete the current ticket before calling the next person.' })
-
-  const [next] = waitingTickets(service.id)
-  if (!next) return res.status(409).json({ error: 'There are no waiting tickets.' })
-  next.status = 'serving'
-  next.startedAt = new Date().toISOString()
-  addNotification(next.userId, 'Status change', `It's your turn at ${service.name}.`)
-  res.json({ ticket: publicTicket(next), service: adminQueueForService(service) })
-})
+router.post('/:serviceId/next', requireAuth, requireAdmin, (req, res) => handle(res, async () => {
+  const entry = await queueRepo.serveNext(req.params.serviceId, req.user.placeId)
+  addNotification(entry.userId, 'Status change', `It's your turn at ${entry.service.name}.`)
+  const services = await queueRepo.adminQueues(req.user.placeId)
+  return res.json({ ticket: publicTicket(entry), service: adminService(services.find((service) => service.id === entry.serviceId)) })
+}))
 
 // POST /api/queues/:serviceId/complete - finish the current ticket
-router.post('/:serviceId/complete', requireAuth, requireAdmin, (req, res) => {
-  const service = ownedService(req, res)
-  if (!service) return
-  const current = servingTicket(service.id)
-  if (!current) return res.status(409).json({ error: 'There is no ticket currently being served.' })
-  current.status = 'served'
-  current.completedAt = new Date().toISOString()
-  addNotification(current.userId, 'Status change', `You have been served at ${service.name}.`)
-  notifyIfNext(service)
-  res.json({ ticket: publicTicket(current), service: adminQueueForService(service) })
-})
+router.post('/:serviceId/complete', requireAuth, requireAdmin, (req, res) => handle(res, async () => {
+  const entry = await queueRepo.completeCurrent(req.params.serviceId, req.user.placeId, 'served')
+  addNotification(entry.userId, 'Status change', `You have been served at ${entry.service.name}.`)
+  await notifyIfNext(req.params.serviceId)
+  const services = await queueRepo.adminQueues(req.user.placeId)
+  return res.json({ ticket: publicTicket(entry), service: adminService(services.find((service) => service.id === entry.serviceId)) })
+}))
 
 // POST /api/queues/:serviceId/no-show - remove the current ticket as a no-show
-router.post('/:serviceId/no-show', requireAuth, requireAdmin, (req, res) => {
-  const service = ownedService(req, res)
-  if (!service) return
-  const current = servingTicket(service.id)
-  if (!current) return res.status(409).json({ error: 'There is no ticket currently being served.' })
-  current.status = 'no-show'
-  addNotification(current.userId, 'Status change', 'Your ticket was marked as a no-show.')
-  notifyIfNext(service)
-  res.json({ ticket: publicTicket(current), service: adminQueueForService(service) })
-})
+router.post('/:serviceId/no-show', requireAuth, requireAdmin, (req, res) => handle(res, async () => {
+  const entry = await queueRepo.completeCurrent(req.params.serviceId, req.user.placeId, 'no-show')
+  addNotification(entry.userId, 'Status change', 'Your ticket was marked as a no-show.')
+  await notifyIfNext(req.params.serviceId)
+  const services = await queueRepo.adminQueues(req.user.placeId)
+  return res.json({ ticket: publicTicket(entry), service: adminService(services.find((service) => service.id === entry.serviceId)) })
+}))
 
-module.exports = { router, PRIORITIES, ordinal, byServicePriority, estimateWaitMinutes, estimateWaitFromNow, minutesPerPerson, queueSummary, waitingTickets, servingTicket }
+module.exports = { router, PRIORITIES, ordinal }

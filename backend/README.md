@@ -1,6 +1,6 @@
-# QueueSmart Backend (A3)
+# QueueSmart Backend
 
-Node.js + Express. Data is kept in memory in `src/data.js`, so restarting the server resets it.
+Node.js + Express with PostgreSQL persistence. Accounts, places, saved places, services, queues, queue entries, and sessions are stored in the database. Notifications remain in memory and reset when the server restarts.
 
 ```bash
 cd backend
@@ -23,7 +23,12 @@ Demo user logins (all use password `demo-pass-123`): `user@queuesmart.test` (May
 | `src/app.js` | Sets up Express and mounts each module's routes |
 | `src/server.js` | Starts the server and loads the demo data |
 | `src/demo.js` | Demo accounts, places and services |
-| `src/data.js` | In-memory data |
+| `src/db.js` | PostgreSQL connection |
+| `src/userRepo.js` | Accounts, profiles, sessions and saved places |
+| `src/placeRepo.js` | Places and saved-place relationships |
+| `src/serviceRepo.js` | Services and their queues |
+| `src/queueRepo.js` | Queue entries and queue lifecycle |
+| `src/data.js` | In-memory notifications |
 | `src/validation.js` | Field checks: required, type, length, email, password |
 | `src/auth.js` | Authentication routes plus `requireAuth` / `requireAdmin` |
 | `src/places.js` | Places, join codes and users' saved places |
@@ -42,7 +47,7 @@ Demo user logins (all use password `demo-pass-123`): `user@queuesmart.test` (May
 
 ## Places API
 
-Each admin runs one place, created when they register. A place's `id` is a random 6-digit number, and that number is also its join code. In A4 it can become the primary key. A user adds a place to their list by typing the code or by scanning the place's QR code. The QR code is just the `joinLink` below, a front-end link with the code in it.
+Each admin runs one place, created when they register. A place's `id` is a random 6-digit number, and that number is also its join code. A user adds a place to their list by typing the code or by scanning the place's QR code. The QR code is just the `joinLink` below, a front-end link with the code in it.
 
 | Method | Path | Who | Body | Returns |
 |---|---|---|---|---|
@@ -79,13 +84,15 @@ Each service belongs to the place of the admin who created it. Admins can only c
 
 Send the token as `Authorization: Bearer <token>`.
 
-Passwords are never stored as plain text: each one is hashed with Node's built-in `crypto.scrypt` and a random salt, stored as `salt:hash`, and checked with `crypto.timingSafeEqual` on login. Sessions are random tokens kept in memory, so they end when the server restarts. In A4 the hashes and sessions move into the database.
+Passwords are never stored as plain text: each one is hashed with Node's built-in `crypto.scrypt` and a random salt, stored as `salt:hash`, and checked with `crypto.timingSafeEqual` on login. Password hashes and sessions are stored in PostgreSQL.
 
 Errors look like `{ "error": "Validation failed.", "fields": { "email": "Email is required." } }`. Status codes: 400 for invalid input, 401 when not signed in or the password is wrong, 403 for the wrong role, 409 when the email is taken.
 
 ## Queue API
 
 Users join an open service with `POST /api/queues/:serviceId/join`, view their active ticket and estimate with `GET /api/queues/me`, and leave with `DELETE /api/queues/tickets/:ticketId`. A user can have one active ticket at a time.
+
+Service, queue, and ticket data is persisted in the `service`, `queue`, and `queue_entry` tables defined in `db/schema.sql`. Deleting a service is a soft delete so completed tickets remain available in history; active tickets are marked `removed`.
 
 Admins can view queues at their place with `GET /api/queues/mine`, call the next person with `POST /api/queues/:serviceId/next`, complete the current ticket with `POST /api/queues/:serviceId/complete`, and mark a no-show with `POST /api/queues/:serviceId/no-show`. Waiting tickets can be reprioritized or reordered within their priority group with `PATCH /api/queues/:serviceId/tickets/:ticketId`, using `{ "priority": "High" }` or `{ "position": 1 }`. New tickets default to `Normal`; equal-priority tickets are served in arrival order.
 
@@ -99,7 +106,7 @@ Wait estimates use the rule `people ahead × minutes per person`. Minutes per pe
 
 ## History API
 
-History is built from the same queue tickets, so nothing extra is stored. Each item has `ticket`, `status`, `serviceName`, `placeName`, `name`, `joinedAt`, `startedAt`, `completedAt` and `waitedMinutes`. Newest first.
+History is queried from the persisted queue entries. Each item has `ticket`, `status`, `serviceName`, `placeName`, `name`, `joinedAt`, `startedAt`, `completedAt` and `waitedMinutes`. Newest first.
 
 | Method | Path | Who | Query | Returns | Shown on |
 |---|---|---|---|---|---|

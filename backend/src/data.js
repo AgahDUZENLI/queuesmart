@@ -1,13 +1,8 @@
-// In-memory data (no database until A4). Restarting the server resets it.
+// Notifications remain in memory; account and queue data use PostgreSQL.
 
 const crypto = require('crypto')
 
 const data = {
-  users: [],
-  sessions: {}, // token -> user id
-  places: [], // offices, shops, clinics... each run by an admin. id = 6-digit join code
-  services: [],
-  queueEntries: [],
   notifications: [],
 }
 
@@ -23,11 +18,6 @@ function newId(list) {
 
 // Used by tests to start each one from empty data
 function reset() {
-  data.users = []
-  data.sessions = {}
-  data.places = []
-  data.services = []
-  data.queueEntries = []
   data.notifications = []
 }
 

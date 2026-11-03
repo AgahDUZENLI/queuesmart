@@ -1,12 +1,13 @@
 const request = require('supertest')
 const { createApp } = require('../src/app')
-const { data, reset } = require('../src/data')
+const { data } = require('../src/data')
 const { ordinal } = require('../src/queues')
 
 let app
 let adminAuth
 let userAuth
 let otherUserAuth
+let serviceIdValue
 
 async function register(body) {
   const res = await request(app).post('/api/auth/register').send({ lastName: 'Test', password: 'correct-horse', ...body })
@@ -14,17 +15,18 @@ async function register(body) {
 }
 
 beforeEach(async () => {
-  reset()
+  data.notifications = []
   app = createApp()
   adminAuth = await register({ role: 'admin', firstName: 'Ada', placeName: 'Help Desk', email: 'admin@example.edu' })
   userAuth = await register({ firstName: 'Uma', email: 'user@example.edu' })
   otherUserAuth = await register({ firstName: 'Max', email: 'other@example.edu' })
-  await request(app).post('/api/services').set(adminAuth).send({
+  const service = await request(app).post('/api/services').set(adminAuth).send({
     name: 'Advising', description: 'Course planning.', duration: 15, priority: 'Normal', status: 'Open',
   })
+  serviceIdValue = service.body.service.id
 })
 
-const serviceId = () => data.services[0].id
+const serviceId = () => serviceIdValue
 const join = (auth) => request(app).post(`/api/queues/${serviceId()}/join`).set(auth)
 const myNotifications = async (auth) => (await request(app).get('/api/notifications/me').set(auth)).body.notifications
 const messages = async (auth) => (await myNotifications(auth)).map((n) => n.message)
