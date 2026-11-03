@@ -439,7 +439,7 @@ async function completeCurrent(serviceId, placeId, status) {
     if (!rows[0]) throw new QueueError(409, 'There is no ticket currently being served.')
     const entry = mapEntry(rows[0])
     await client.query(
-      "UPDATE queue_entry SET status = $2, completed_at = CASE WHEN $2 = 'served' THEN now() ELSE completed_at END WHERE id = $1",
+      "UPDATE queue_entry SET status = $2, completed_at = CASE WHEN $2::entry_status = 'served' THEN now() ELSE completed_at END WHERE id = $1",
       [entry.id, status],
     )
     await client.query('COMMIT')
