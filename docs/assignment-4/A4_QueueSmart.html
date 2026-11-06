@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>QueueSmart – Assignment 4</title>
+<style>
+  @page {
+    size: Letter;
+    margin: 0.8in 0.75in 0.75in;
+    @top-left { content: "QueueSmart – Assignment 4"; font: 8.5pt Helvetica, Arial, sans-serif; color: #666; }
+    @bottom-right { content: "Page " counter(page); font: 8.5pt Helvetica, Arial, sans-serif; color: #666; }
+  }
+  body { font: 10pt/1.42 Helvetica, Arial, sans-serif; color: #1a1a1a; margin: 0; background: #fff; }
+  h1 { font-size: 20pt; margin: 0 0 2pt; }
+  .subtitle { font-size: 13pt; color: #333; margin: 0 0 4pt; }
+  .team { color: #555; margin: 0 0 14pt; padding-bottom: 8pt; border-bottom: 1.5pt solid #1f4e79; }
+  h2 { font-size: 13.5pt; color: #1f4e79; margin: 16pt 0 6pt; break-after: avoid; }
+  h3 { font-size: 11pt; margin: 11pt 0 4pt; break-after: avoid; }
+  p { margin: 0 0 6pt; }
+  ul { margin: 0 0 6pt; padding-left: 16pt; }
+  li { margin-bottom: 2.5pt; }
+  table { width: 100%; border-collapse: collapse; margin: 4pt 0 8pt; font-size: 9pt; }
+  th, td { border: 0.6pt solid #b8c4d0; padding: 3.5pt 5pt; text-align: left; vertical-align: top; }
+  th { background: #e8eef5; font-weight: bold; }
+  tr { break-inside: avoid; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  code { font: 8.6pt Menlo, Consolas, monospace; background: #f2f4f7; padding: 0 2pt; border-radius: 2pt; }
+  pre { font: 7.6pt/1.35 Menlo, Consolas, monospace; background: #f6f8fa; border: 0.6pt solid #d0d7de; border-radius: 3pt; padding: 6pt 8pt; margin: 4pt 0 8pt; white-space: pre-wrap; }
+  pre code { background: none; padding: 0; font: inherit; }
+  pre.terminal { background: #1e1e1e; color: #e6e6e6; border-color: #1e1e1e; font-size: 6.3pt; white-space: pre; break-inside: avoid; }
+  .stats { display: flex; gap: 6pt; margin: 4pt 0 8pt; }
+  .stat { flex: 1; border: 0.6pt solid #b8c4d0; border-radius: 3pt; padding: 5pt 6pt; text-align: center; }
+  .stat b { display: block; font-size: 14pt; color: #1f4e79; }
+  .stat span { font-size: 8pt; color: #555; }
+  .contrib td:first-child { width: 19%; }
+  .contrib td:nth-child(2) { width: 52%; }
+  .small { font-size: 8.8pt; color: #555; }
+  .page-break { break-before: page; }
+</style>
+</head>
+<body>
+
+<h1>QueueSmart – Assignment 4</h1>
+<p class="subtitle">Data Design &amp; Database Implementation</p>
+<p class="team">Team: Agah Duzenli, Dang (wabisabiz), Skyler Tran, Derek Lihou · November 2026</p>
+
+<h2>1. GitHub Repository</h2>
+<p><b>Link:</b> <a href="https://github.com/AgahDUZENLI/queuesmart">https://github.com/AgahDUZENLI/queuesmart</a> (branch <code>main</code>)</p>
+<p>For A4 we added a PostgreSQL database to QueueSmart. Everything the app uses is now saved in the database: accounts, profiles, places, services, queues, tickets and notifications. If the server restarts, nothing is lost.</p>
+<p>The tables are defined in <code>backend/db/schema.sql</code>. The code that talks to the database is in <code>backend/src</code> (<code>db.js</code> and the <code>*Repo.js</code> files), and the tests are in <code>backend/tests</code>.</p>
+<pre><code>docker compose up -d     # starts the database, back end and front end
+cd backend
+npm install
+npm test                 # runs the tests
+npm run coverage         # runs the tests and shows coverage</code></pre>
+<p><b>Why PostgreSQL?</b> Our data is connected: a place has services, each service has a queue, and each queue has tickets from users. A relational database fits this well. Foreign keys keep the links correct, and constraints stop bad data from being saved. It also fit our earlier work. In A3 all data went through one file, so we could replace it with database code without changing the API or the A2 screens.</p>
+
+<h2>2. Database Schema</h2>
+<p>We used every table from the assignment and added three small tables that the app needs.</p>
+<table>
+  <tr><th>Assignment table</th><th>Our table</th><th>Primary key</th><th>Foreign keys and notes</th></tr>
+  <tr><td>UserCredentials</td><td><code>user_credentials</code></td><td><code>id</code></td><td>Email is <code>UNIQUE</code>. The password is saved as a scrypt hash, never as plain text.</td></tr>
+  <tr><td>UserProfile</td><td><code>user_profile</code></td><td><code>user_id</code></td><td><code>user_id</code> → user_credentials, <code>email</code> → user_credentials.email, <code>place_id</code> → place</td></tr>
+  <tr><td>Service</td><td><code>service</code></td><td><code>id</code></td><td><code>place_id</code> → place</td></tr>
+  <tr><td>Queue</td><td><code>queue</code></td><td><code>id</code></td><td><code>service_id</code> → service (one queue per service)</td></tr>
+  <tr><td>QueueEntry</td><td><code>queue_entry</code></td><td><code>id</code></td><td><code>queue_id</code> → queue, <code>user_id</code> → user_credentials</td></tr>
+  <tr><td>Notification</td><td><code>notification</code></td><td><code>id</code></td><td><code>user_id</code> → user_credentials</td></tr>
+  <tr><td>(extra)</td><td><code>place</code></td><td><code>id</code></td><td>The office or clinic an admin runs. Its 6-digit id is also the join code.</td></tr>
+  <tr><td>(extra)</td><td><code>saved_place</code></td><td><code>user_id</code>, <code>place_id</code></td><td>Each user's saved places. <code>user_id</code> → user_credentials, <code>place_id</code> → place</td></tr>
+  <tr><td>(extra)</td><td><code>session</code></td><td><code>token</code></td><td>Keeps users logged in. <code>user_id</code> → user_credentials</td></tr>
+</table>
+
+<p><b>A few small differences from the assignment:</b></p>
+<ul>
+  <li>A queue can also be <code>Paused</code>, not only Open or Closed, because our A2 admin screens already have a pause option.</li>
+  <li>Instead of one "canceled" status, a ticket can be <code>left</code>, <code>removed</code> or <code>no-show</code>, so history shows why the ticket ended.</li>
+  <li>When an admin deletes a service, we only mark it as deleted. This way users can still see their old tickets in history.</li>
+</ul>
+
+<h3>SQL to create the tables (backend/db/schema.sql)</h3>
+<pre><code>-- QueueSmart database schema (PostgreSQL). Matches schema.dbml, plus the rules
+-- DBML can&#x27;t express: CHECK constraints and partial unique indexes.
+-- Docker runs this file the first time the database volume is created.
+
+CREATE TYPE user_role AS ENUM (&#x27;user&#x27;, &#x27;admin&#x27;);
+CREATE TYPE priority_level AS ENUM (&#x27;Low&#x27;, &#x27;Normal&#x27;, &#x27;High&#x27;);
+CREATE TYPE queue_status AS ENUM (&#x27;Open&#x27;, &#x27;Paused&#x27;, &#x27;Closed&#x27;);
+CREATE TYPE entry_status AS ENUM (&#x27;waiting&#x27;, &#x27;serving&#x27;, &#x27;served&#x27;, &#x27;left&#x27;, &#x27;removed&#x27;, &#x27;no-show&#x27;);
+CREATE TYPE notification_type AS ENUM (&#x27;Queue update&#x27;, &#x27;Status change&#x27;);
+CREATE TYPE notification_status AS ENUM (&#x27;sent&#x27;, &#x27;viewed&#x27;);
+
+CREATE TABLE place (
+  id integer PRIMARY KEY, -- 6-digit id, also the join code
+  name varchar(50) NOT NULL
+);
+
+CREATE TABLE user_credentials (
+  id integer PRIMARY KEY, -- 6-digit id from the app
+  email varchar(254) NOT NULL UNIQUE,
+  password_hash varchar(255) NOT NULL, -- scrypt salt:hash, never plain text
+  role user_role NOT NULL DEFAULT &#x27;user&#x27;,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE user_profile (
+  user_id integer PRIMARY KEY REFERENCES user_credentials (id),
+  email varchar(254) NOT NULL UNIQUE REFERENCES user_credentials (email) ON UPDATE CASCADE,
+  first_name varchar(50) NOT NULL,
+  last_name varchar(50) NOT NULL,
+  phone varchar(20),
+  email_me boolean NOT NULL DEFAULT true,
+  place_id integer REFERENCES place (id) -- admins only: the place they run
+);
+
+CREATE TABLE service (
+  id integer PRIMARY KEY,
+  place_id integer NOT NULL REFERENCES place (id),
+  name varchar(100) NOT NULL,
+  description varchar(500) NOT NULL,
+  duration integer NOT NULL CHECK (duration BETWEEN 1 AND 480), -- minutes
+  priority priority_level NOT NULL,
+  max_in_line integer NOT NULL DEFAULT 25 CHECK (max_in_line BETWEEN 1 AND 500),
+  opens time NOT NULL DEFAULT &#x27;09:00&#x27;,
+  closes time NOT NULL DEFAULT &#x27;16:30&#x27;,
+  appointments boolean NOT NULL DEFAULT false,
+  deleted_at timestamptz, -- keeps ticket history after a delete
+  CHECK (closes &gt; opens)
+);
+
+CREATE INDEX service_place_id_idx ON service (place_id);
+
+CREATE TABLE queue (
+  id integer PRIMARY KEY,
+  service_id integer NOT NULL UNIQUE REFERENCES service (id),
+  status queue_status NOT NULL DEFAULT &#x27;Closed&#x27;,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE queue_entry (
+  id integer PRIMARY KEY,
+  queue_id integer NOT NULL REFERENCES queue (id),
+  user_id integer NOT NULL REFERENCES user_credentials (id),
+  ticket varchar(12) NOT NULL, -- e.g. A-001
+  service_name varchar(100) NOT NULL, -- name at time of joining
+  priority priority_level NOT NULL DEFAULT &#x27;Normal&#x27;,
+  position integer NOT NULL, -- queueOrder in the code
+  status entry_status NOT NULL DEFAULT &#x27;waiting&#x27;,
+  joined_at timestamptz NOT NULL DEFAULT now(),
+  started_at timestamptz,
+  completed_at timestamptz,
+  close_notified boolean NOT NULL DEFAULT false
+);
+
+CREATE INDEX queue_entry_queue_status_idx ON queue_entry (queue_id, status);
+CREATE INDEX queue_entry_user_status_idx ON queue_entry (user_id, status);
+
+-- A user can only have one active ticket at a time
+CREATE UNIQUE INDEX one_active_ticket_per_user ON queue_entry (user_id)
+  WHERE status IN (&#x27;waiting&#x27;, &#x27;serving&#x27;);
+
+-- A queue can only serve one person at a time
+CREATE UNIQUE INDEX one_serving_per_queue ON queue_entry (queue_id)
+  WHERE status = &#x27;serving&#x27;;
+
+CREATE TABLE notification (
+  id integer PRIMARY KEY,
+  user_id integer NOT NULL REFERENCES user_credentials (id),
+  type notification_type NOT NULL,
+  message varchar(255) NOT NULL,
+  status notification_status NOT NULL DEFAULT &#x27;sent&#x27;,
+  emailed boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX notification_user_id_idx ON notification (user_id);
+
+CREATE TABLE saved_place (
+  user_id integer REFERENCES user_credentials (id),
+  place_id integer REFERENCES place (id),
+  PRIMARY KEY (user_id, place_id)
+);
+
+CREATE TABLE session (
+  token uuid PRIMARY KEY,
+  user_id integer NOT NULL REFERENCES user_credentials (id),
+  created_at timestamptz NOT NULL DEFAULT now()
+);</code></pre>
+
+<h2>3. Validation and Saving Data</h2>
+<p>We check the data in two places. First, the back end checks every request and sends back a clear error message. Then the database checks it again, so bad data can't be saved even if something gets past the back end.</p>
+<table style="break-inside: avoid">
+  <tr><th>Rule</th><th>Back end</th><th>Database</th></tr>
+  <tr><td>Required fields</td><td>Returns "… is required."</td><td><code>NOT NULL</code></td></tr>
+  <tr><td>Length limits</td><td>For example: names 50, email 254, description 500 characters</td><td><code>varchar</code> with the same limits</td></tr>
+  <tr><td>Data types</td><td>Numbers, true/false, times and allowed values</td><td>Column types, enums and <code>CHECK</code> rules</td></tr>
+  <tr><td>Unique values</td><td>A duplicate email returns an error</td><td><code>UNIQUE</code> email, and only one active ticket per user</td></tr>
+</table>
+<p>All forms in the app send their data to the back end, which saves it in the database. The screens, like queue status, history, services, notifications and profile, load their data from the database. To test this, we restarted the server, and all the data was still there.</p>
+
+<h2>4. Code Coverage</h2>
+<p>We ran <code>npm run coverage</code> on November 6, 2026. All 95 tests pass, and coverage is 91.35%, which is above the 70–80% goal.</p>
+<div class="stats">
+  <div class="stat"><b>8 / 8</b><span>Test suites passed</span></div>
+  <div class="stat"><b>95 / 95</b><span>Tests passed</span></div>
+  <div class="stat"><b>91.35%</b><span>Statements</span></div>
+  <div class="stat"><b>81.26%</b><span>Branches</span></div>
+  <div class="stat"><b>91.35%</b><span>Functions</span></div>
+  <div class="stat"><b>94.23%</b><span>Lines</span></div>
+</div>
+<p class="small"><code>data.js</code> has low coverage because it is old code from A3 that the app no longer uses.</p>
+<pre class="terminal"><code>$ npm run coverage
+
+------------------|---------|----------|---------|---------|-------------------------------------------------------------
+File              | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                           
+------------------|---------|----------|---------|---------|-------------------------------------------------------------
+All files         |   91.35 |    81.26 |   91.35 |   94.23 |                                                             
+ app.js           |   96.66 |       50 |     100 |     100 | 29-31                                                       
+ auth.js          |    98.3 |    94.54 |     100 |   98.14 | 92                                                          
+ data.js          |    37.5 |      100 |       0 |    37.5 | 13-21                                                       
+ db.js            |    90.9 |       50 |     100 |     100 | 9                                                           
+ demo.js          |     100 |      100 |     100 |     100 |                                                             
+ history.js       |   90.38 |    76.31 |   84.21 |   90.69 | 47-50                                                       
+ notifications.js |   91.11 |    84.21 |     100 |   93.02 | 83,106,139                                                  
+ placeRepo.js     |   93.33 |    83.33 |     100 |     100 | 31                                                          
+ places.js        |     100 |    92.85 |     100 |     100 | 32                                                          
+ profile.js       |     100 |    91.66 |     100 |     100 | 21                                                          
+ queueRepo.js     |   86.58 |    66.66 |   87.75 |   92.38 | 220,281,290-292,316,342-343,367,374,386-387,448-449,475-476 
+ queues.js        |      93 |    82.97 |     100 |   95.34 | 77,86,161,177                                               
+ serviceRepo.js   |   80.51 |     64.7 |   76.92 |   82.85 | 79-81,86,114-115,133-134,154-155,169-170                    
+ services.js      |   94.02 |    76.47 |     100 |     100 | 57,77,92,96-107                                             
+ userRepo.js      |   98.46 |    91.66 |   93.33 |     100 | 82,146-147                                                  
+ validation.js    |   98.41 |    98.55 |     100 |     100 | 42                                                          
+------------------|---------|----------|---------|---------|-------------------------------------------------------------
+
+Test Suites: 8 passed, 8 total
+Tests:       95 passed, 95 total
+Snapshots:   0 total
+Time:        4.156 s, estimated 5 s
+Ran all test suites.</code></pre>
+
+<h2 class="page-break">5. Team Contributions</h2>
+<table class="contrib">
+  <tr><th>Group member name</th><th>What is your contribution?</th><th>Discussion notes</th></tr>
+  <tr>
+    <td>Agah Duzenli<br>(GitHub: AgahDUZENLI)</td>
+    <td>Designed the database tables (<code>schema.sql</code>) with their keys and rules, and added PostgreSQL to Docker so everything starts with one command. Tested the whole app with the database and wrote this report.</td>
+    <td>Nov 1: we picked PostgreSQL and split the work. I shared the schema and Docker setup. Nov 6: checked everything before submitting.</td>
+  </tr>
+  <tr>
+    <td>Skyler Tran<br>(GitHub: skylertran19)</td>
+    <td>Moved user accounts and profiles to the database, and saved sessions too, so users stay logged in. Added a Profile page and set up the test database that all our tests use.</td>
+    <td>Nov 1: took accounts and profiles and finished them (PR #23).</td>
+  </tr>
+  <tr>
+    <td>Dang<br>(GitHub: wabisabiz)</td>
+    <td>Moved services, queues, tickets, places and history to the database, and updated their tests.</td>
+    <td>Nov 3: finished services and queues (PR #24) and fixed a small queue bug.</td>
+  </tr>
+  <tr>
+    <td>Derek Lihou<br>(GitHub: DerekLihou)</td>
+    <td>Moved notifications to the database. They are now saved and change to "viewed" when the user reads them. Added more notification tests.</td>
+    <td>Nov 5: finished notifications (PR #25).</td>
+  </tr>
+</table>
+
+</body>
+</html>
