@@ -58,11 +58,13 @@ function adminService(service) {
 async function notifyIfNext(serviceId) {
   const context = await queueRepo.serviceContext(serviceId)
   if (!context) return
+
   const waiting = await queueRepo.entriesForQueue(context.queueId, 'waiting')
   const serving = (await queueRepo.entriesForQueue(context.queueId, 'serving'))[0] || null
   const next = waiting[0]
+
   if (!serving && next && !next.closeNotified) {
-    notifyNextInLine(context.service, waiting, serving)
+    await notifyNextInLine(context.service, waiting, serving)
     await queueRepo.markCloseNotified(next.id)
   }
 }
@@ -78,97 +80,187 @@ async function handle(res, operation) {
 
 const router = express.Router()
 
-// GET /api/queues/me - the signed-in user's active ticket and current estimate
+// GET /api/queues/me
 router.get('/me', requireAuth, (req, res) => handle(res, async () => {
-  if (req.user.role !== 'user') return res.status(403).json({ error: 'Only users can view a personal queue ticket.' })
+  if (req.user.role !== 'user') {
+    return res.status(403).json({ error: 'Only users can view a personal queue ticket.' })
+  }
+
   const result = await queueRepo.userTicket(req.user.id)
+
   return res.json({
     ticket: result.ticket ? userTicketPayload(result.ticket) : null,
-    recent: result.recent ? { ...publicTicket(result.recent), service: result.recent.service } : null,
+    recent: result.recent
+      ? { ...publicTicket(result.recent), service: result.recent.service }
+      : null,
   })
 }))
 
-// GET /api/queues/mine - all queue state for the signed-in admin's place
+// GET /api/queues/mine
 router.get('/mine', requireAuth, requireAdmin, (req, res) => handle(res, async () => {
   const [place, services] = await Promise.all([
     placeRepo.findById(req.user.placeId),
     queueRepo.adminQueues(req.user.placeId),
   ])
-  return res.json({ place, services: services.map(adminService) })
+
+  return res.json({
+    place,
+    services: services.map(adminService),
+  })
 }))
 
-// POST /api/queues/:serviceId/join - join the end of a service queue
+// POST /api/queues/:serviceId/join
 router.post('/:serviceId/join', requireAuth, (req, res) => handle(res, async () => {
-  if (req.user.role !== 'user') return res.status(403).json({ error: 'Only users can join a queue.' })
+  if (req.user.role !== 'user') {
+    return res.status(403).json({ error: 'Only users can join a queue.' })
+  }
+
   const { ticket } = await queueRepo.join(req.params.serviceId, req.user.id)
-  addNotification(req.user.id, 'Queue update', `You joined ${ticket.service.name}. You are ${ordinal(ticket.position)} in line.`)
+
+  await addNotification(
+    req.user.id,
+    'Queue update',
+    `You joined ${ticket.service.name}. You are ${ordinal(ticket.position)} in line.`
+  )
+
   await notifyIfNext(ticket.serviceId)
+
   return res.status(201).json({ ticket: userTicketPayload(ticket) })
 }))
 
-// DELETE /api/queues/tickets/:ticketId - a user leaves, or an admin removes, a ticket
+// DELETE /api/queues/tickets/:ticketId
 router.delete('/tickets/:ticketId', requireAuth, (req, res) => handle(res, async () => {
   const entry = await queueRepo.removeTicket(req.params.ticketId, req.user)
+
   if (req.user.role === 'user') {
-    addNotification(entry.userId, 'Queue update', `You left the queue for ${entry.serviceName}.`)
+    await addNotification(
+      entry.userId,
+      'Queue update',
+      `You left the queue for ${entry.serviceName}.`
+    )
   } else {
-    addNotification(entry.userId, 'Status change', 'Your ticket was removed from the queue.')
+    await addNotification(
+      entry.userId,
+      'Status change',
+      'Your ticket was removed from the queue.'
+    )
   }
+
   await notifyIfNext(entry.serviceId)
+
   return res.status(204).end()
 }))
 
-// PATCH /api/queues/:serviceId/tickets/:ticketId - admins can set priority or position
+// PATCH /api/queues/:serviceId/tickets/:ticketId
 router.patch('/:serviceId/tickets/:ticketId', requireAuth, requireAdmin, (req, res) => handle(res, async () => {
   const context = await queueRepo.serviceContext(req.params.serviceId)
+
   if (!context) return res.status(404).json({ error: 'Service not found.' })
+
   if (context.service.placeId !== req.user.placeId) {
     return res.status(403).json({ error: 'You can only manage queues at your own place.' })
   }
 
   const body = req.body || {}
   const waiting = await queueRepo.entriesForQueue(context.queueId, 'waiting')
+
   const errors = findErrors({
-    ...(body.priority !== undefined ? { priority: checkOneOf(body.priority, PRIORITIES, 'Priority') } : {}),
-    ...(body.position !== undefined ? { position: checkWholeNumber(body.position, 'Position', 1, Math.max(1, waiting.length)) } : {}),
+    ...(body.priority !== undefined
+      ? { priority: checkOneOf(body.priority, PRIORITIES, 'Priority') }
+      : {}),
+    ...(body.position !== undefined
+      ? { position: checkWholeNumber(body.position, 'Position', 1, Math.max(1, waiting.length)) }
+      : {}),
   })
+
   if (body.priority === undefined && body.position === undefined) {
     return res.status(400).json({ error: 'Provide a priority or position to update.' })
   }
+
   if (errors) return res.status(400).json({ error: 'Validation failed.', fields: errors })
 
-  const result = await queueRepo.updateTicket(req.params.serviceId, req.user.placeId, req.params.ticketId, body)
+  const result = await queueRepo.updateTicket(
+    req.params.serviceId,
+    req.user.placeId,
+    req.params.ticketId,
+    body
+  )
+
   await notifyIfNext(req.params.serviceId)
+
   return res.json({
     ticket: publicTicket(result.ticket),
-    queue: result.queue.map((entry, index) => ({ ...publicTicket(entry), position: index + 1 })),
+    queue: result.queue.map((entry, index) => ({
+      ...publicTicket(entry),
+      position: index + 1,
+    })),
   })
 }))
 
-// POST /api/queues/:serviceId/next - call the first waiting ticket to service
+// POST /api/queues/:serviceId/next
 router.post('/:serviceId/next', requireAuth, requireAdmin, (req, res) => handle(res, async () => {
   const entry = await queueRepo.serveNext(req.params.serviceId, req.user.placeId)
-  addNotification(entry.userId, 'Status change', `It's your turn at ${entry.service.name}.`)
+
+  await addNotification(
+    entry.userId,
+    'Status change',
+    `It's your turn at ${entry.service.name}.`
+  )
+
   const services = await queueRepo.adminQueues(req.user.placeId)
-  return res.json({ ticket: publicTicket(entry), service: adminService(services.find((service) => service.id === entry.serviceId)) })
+
+  return res.json({
+    ticket: publicTicket(entry),
+    service: adminService(services.find((service) => service.id === entry.serviceId)),
+  })
 }))
 
-// POST /api/queues/:serviceId/complete - finish the current ticket
+// POST /api/queues/:serviceId/complete
 router.post('/:serviceId/complete', requireAuth, requireAdmin, (req, res) => handle(res, async () => {
-  const entry = await queueRepo.completeCurrent(req.params.serviceId, req.user.placeId, 'served')
-  addNotification(entry.userId, 'Status change', `You have been served at ${entry.service.name}.`)
+  const entry = await queueRepo.completeCurrent(
+    req.params.serviceId,
+    req.user.placeId,
+    'served'
+  )
+
+  await addNotification(
+    entry.userId,
+    'Status change',
+    `You have been served at ${entry.service.name}.`
+  )
+
   await notifyIfNext(req.params.serviceId)
+
   const services = await queueRepo.adminQueues(req.user.placeId)
-  return res.json({ ticket: publicTicket(entry), service: adminService(services.find((service) => service.id === entry.serviceId)) })
+
+  return res.json({
+    ticket: publicTicket(entry),
+    service: adminService(services.find((service) => service.id === entry.serviceId)),
+  })
 }))
 
-// POST /api/queues/:serviceId/no-show - remove the current ticket as a no-show
+// POST /api/queues/:serviceId/no-show
 router.post('/:serviceId/no-show', requireAuth, requireAdmin, (req, res) => handle(res, async () => {
-  const entry = await queueRepo.completeCurrent(req.params.serviceId, req.user.placeId, 'no-show')
-  addNotification(entry.userId, 'Status change', 'Your ticket was marked as a no-show.')
+  const entry = await queueRepo.completeCurrent(
+    req.params.serviceId,
+    req.user.placeId,
+    'no-show'
+  )
+
+  await addNotification(
+    entry.userId,
+    'Status change',
+    'Your ticket was marked as a no-show.'
+  )
+
   await notifyIfNext(req.params.serviceId)
+
   const services = await queueRepo.adminQueues(req.user.placeId)
-  return res.json({ ticket: publicTicket(entry), service: adminService(services.find((service) => service.id === entry.serviceId)) })
+
+  return res.json({
+    ticket: publicTicket(entry),
+    service: adminService(services.find((service) => service.id === entry.serviceId)),
+  })
 }))
 
 module.exports = { router, PRIORITIES, ordinal }
