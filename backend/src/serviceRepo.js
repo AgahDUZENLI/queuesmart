@@ -155,6 +155,12 @@ async function remove(id, placeId) {
       return false
     }
     await client.query('UPDATE queue SET status = status WHERE service_id = $1', [Number(id)])
+    const { rows: active } = await client.query(
+      `SELECT user_id FROM queue_entry
+       WHERE queue_id = (SELECT id FROM queue WHERE service_id = $1)
+         AND status IN ('waiting', 'serving')`,
+      [Number(id)],
+    )
     await client.query('UPDATE service SET deleted_at = now() WHERE id = $1', [Number(id)])
     await client.query("UPDATE queue SET status = 'Closed' WHERE service_id = $1", [Number(id)])
     await client.query(
@@ -164,7 +170,7 @@ async function remove(id, placeId) {
       [Number(id)],
     )
     await client.query('COMMIT')
-    return true
+    return { removedUserIds: active.map((row) => row.user_id) }
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {})
     throw error

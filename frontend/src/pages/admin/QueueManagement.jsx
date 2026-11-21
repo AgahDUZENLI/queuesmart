@@ -1,6 +1,7 @@
 import Button from '../../components/Button'
 import AdminStatus from './AdminStatus'
 import { PRIORITIES } from '../../utils/queueRules'
+import { clockTime } from '../../utils/time'
 
 function AllServiceQueues({ services, onManageService }) {
   return services.map((service) => (
@@ -99,7 +100,7 @@ function QueueManagement({ services, selectedService, showAllQueues, nowServing,
           <div className="serving-person">
             <p className="admin-muted">{nowServing ? 'Now serving' : 'No one is being served'}</p>
             {nowServing && <p><strong>{nowServing.ticket}</strong><span>{nowServing.name}</span></p>}
-            {nowServing && <p className="admin-muted">Started {nowServing.started}</p>}
+            {nowServing && <p className="admin-muted">Started {clockTime(nowServing.startedAt)}</p>}
           </div>
           <div className="serving-actions">
             <Button variant="secondary" disabled={!nowServing} onClick={onNoShow}>No-show</Button>

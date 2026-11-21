@@ -20,6 +20,9 @@ services:
       - /app/node_modules
     environment:
       - PORT=4000
+      # The office's time zone: decides what "today" means for wait estimates,
+      # report date filters, and the times written in CSV reports
+      - TZ=America/Chicago
       - DATABASE_URL=postgres://queuesmart:queuesmart@db:5432/queuesmart
     depends_on:
       db:

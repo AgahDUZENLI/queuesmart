@@ -145,6 +145,22 @@ describe('database-backed services', () => {
       service: { name: serviceBody.name },
     })
     expect((await request(app).get('/api/history/me').set(userAuth)).body.history[0].serviceName).toBe(serviceBody.name)
+
+    // The person in line is told why, and emailed because emailMe defaults to on
+    const { notifications } = (await request(app).get('/api/notifications/me').set(userAuth)).body
+    expect(notifications[0]).toMatchObject({
+      type: 'Status change',
+      message: 'Academic Advising is no longer available, so your ticket was cancelled. Sorry for the inconvenience!',
+      emailed: true,
+    })
+  })
+
+  test('deleting a service with nobody in line sends no notifications', async () => {
+    await createService()
+    await request(app).delete(`/api/services/${serviceId}`).set(adminAuth).expect(204)
+    const { rows } = await db.query('SELECT COUNT(*) AS count FROM notification')
+    expect(Number(rows[0].count)).toBe(0)
+    expect((await request(app).delete(`/api/services/${serviceId}`).set(adminAuth)).status).toBe(404)
   })
 
   test('demo services and accounts are persistent and seeded only once', async () => {

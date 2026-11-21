@@ -18,6 +18,11 @@ function formatTime(iso) {
   return iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'
 }
 
+// Old tickets keep the name the person saw; show today's name next to it after a rename
+const serviceLabel = (visit) => (visit.serviceName === visit.currentServiceName
+  ? visit.serviceName
+  : `${visit.serviceName} (now ${visit.currentServiceName})`)
+
 const minutes = (value) => (value === null || value === undefined ? '—' : `${value} min`)
 
 // A titled table; rows are arrays of cells, the first cell is the row heading
@@ -114,7 +119,7 @@ function AdminReports({ services }) {
             title="Queue history"
             note={`${report.visits.length} tickets`}
             headers={['Ticket', 'Joined', 'Name', 'Service', 'Outcome', 'Waited', 'Visit length']}
-            rows={report.visits.map((v) => [v.ticket, formatTime(v.joinedAt), v.name, v.serviceName, OUTCOMES[v.status] || v.status, minutes(v.waitedMinutes), minutes(v.servedMinutes)])}
+            rows={report.visits.map((v) => [v.ticket, formatTime(v.joinedAt), v.name, serviceLabel(v), OUTCOMES[v.status] || v.status, minutes(v.waitedMinutes), minutes(v.servedMinutes)])}
           />
         </>
       )}

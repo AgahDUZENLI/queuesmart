@@ -28,6 +28,7 @@
       "src/**/*.js",
       "!src/server.js"
     ],
+    "globalSetup": "./tests/globalSetup.js",
     "setupFilesAfterEnv": [
       "./tests/setup.js"
     ]

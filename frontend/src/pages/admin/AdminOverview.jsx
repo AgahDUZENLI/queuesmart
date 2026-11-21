@@ -2,6 +2,7 @@ import Button from '../../components/Button'
 import AdminStatus from './AdminStatus'
 import JoinCodeCard from './JoinCodeCard'
 import Metric from './Metric'
+import { clockTime } from '../../utils/time'
 
 function AdminOverview({ services, today, totalWaiting, openServices, averageWait, currentlyServing, averageDuration, onCreate, onManage, onToggleStatus, onServeNext, onComplete, onNoShow }) {
   // Open services, plus any still finishing someone after being paused
@@ -38,7 +39,7 @@ function AdminOverview({ services, today, totalWaiting, openServices, averageWai
                   {serving ? (
                     <>
                       <p><strong>{serving.ticket}</strong><span>{serving.name}</span></p>
-                      <p className="admin-muted">Started {serving.started} · {serving.minutesIn} min in · about {serving.minutesLeft} min left</p>
+                      <p className="admin-muted">Started {clockTime(serving.startedAt)} · {serving.minutesIn} min in · about {serving.minutesLeft} min left</p>
                     </>
                   ) : (
                     <p className="admin-muted">{next ? `No one is being served. Next up: ${next.ticket} · ${next.name}` : 'No one in line'}</p>

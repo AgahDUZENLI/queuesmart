@@ -45,6 +45,7 @@ function buildReport(place, services, allVisits, filters) {
     .filter((visit) => inRange(visit, filters))
     .sort((a, b) => Date.parse(b.joinedAt) - Date.parse(a.joinedAt) || b.id - a.id)
 
+  const currentNames = new Map(services.map((service) => [service.id, service.name]))
   const servicesReport = services
     .filter((service) => !filters.serviceId || service.id === filters.serviceId)
     .map((service) => {
@@ -85,8 +86,28 @@ function buildReport(place, services, allVisits, filters) {
     },
     services: servicesReport,
     customers: [...customers.values()].sort((a, b) => b.visits - a.visits || a.name.localeCompare(b.name)),
-    visits: visits.map(({ id, serviceId, startedAt, ...visit }) => visit),
+    // serviceName is the name when the person joined; currentServiceName is today's name.
+    // Totals above group by service id, so a rename never splits a service's numbers.
+    visits: visits.map(({ id, serviceId, startedAt, ...visit }) => ({
+      ...visit,
+      currentServiceName: currentNames.get(serviceId) || visit.serviceName,
+    })),
   }
+}
+
+// "Transcripts & Records (now Registrar)" when the service was renamed after the visit
+function serviceLabel(visit) {
+  return visit.serviceName === visit.currentServiceName
+    ? visit.serviceName
+    : `${visit.serviceName} (now ${visit.currentServiceName})`
+}
+
+// "2026-11-19 14:52" in the server's time zone (TZ), which spreadsheets read as a date and time
+function localTime(iso) {
+  if (!iso) return ''
+  const date = new Date(iso)
+  const pad = (number) => String(number).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 // Quotes a CSV cell when it has a comma, quote or line break
@@ -103,7 +124,7 @@ function reportToCsv(report) {
   return [
     csvRows([
       ['QueueSmart report', report.place.name],
-      ['Generated', report.generatedAt],
+      ['Generated', localTime(report.generatedAt)],
       ['From', report.filters.from || 'All time'],
       ['To', report.filters.to || 'All time'],
       ['Service', report.filters.serviceId ? report.services[0]?.name : 'All services'],
@@ -121,12 +142,12 @@ function reportToCsv(report) {
     csvRows([
       ['Customers'],
       ['Name', 'Email', 'Visits', 'Served', 'No-shows', 'Left', 'Last visit'],
-      ...report.customers.map((c) => [c.name, c.email, c.visits, c.served, c.noShow, c.left, c.lastVisit]),
+      ...report.customers.map((c) => [c.name, c.email, c.visits, c.served, c.noShow, c.left, localTime(c.lastVisit)]),
     ]),
     csvRows([
       ['Visits'],
       ['Joined', 'Ticket', 'Name', 'Email', 'Service', 'Outcome', 'Waited (min)', 'Visit length (min)', 'Completed'],
-      ...report.visits.map((v) => [v.joinedAt, v.ticket, v.name, v.email, v.serviceName, v.status, v.waitedMinutes, v.servedMinutes, v.completedAt]),
+      ...report.visits.map((v) => [localTime(v.joinedAt), v.ticket, v.name, v.email, serviceLabel(v), v.status, v.waitedMinutes, v.servedMinutes, localTime(v.completedAt)]),
     ]),
   ].join('\n\n') + '\n'
 }
@@ -138,7 +159,7 @@ async function loadPlaceData(placeId) {
       `SELECT s.id, s.name, s.priority, s.duration, s.opens, s.closes, s.deleted_at, q.status
        FROM service s JOIN queue q ON q.service_id = s.id
        WHERE CAST(s.place_id AS text) = CAST($1 AS text)
-       ORDER BY s.id`,
+       ORDER BY s.name, s.id`,
       [placeId],
     ),
     db.query(
@@ -206,4 +227,4 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
   res.json(report)
 })
 
-module.exports = { router, readReportFilters, buildReport, reportToCsv, csvCell }
+module.exports = { router, readReportFilters, buildReport, reportToCsv, csvCell, serviceLabel, localTime }

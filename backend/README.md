@@ -95,7 +95,7 @@ Each service belongs to the place of the admin who created it. Admins can only c
 | GET | `/api/services/:id` | anyone | | `200 { service }` |
 | POST | `/api/services` | admin | see fields below | `201 { service }` |
 | PUT | `/api/services/:id` | admin | only the fields that change | `200 { service }` |
-| DELETE | `/api/services/:id` | admin | | `204`. Past tickets are kept for history; anyone still in line is marked `removed` |
+| DELETE | `/api/services/:id` | admin | | `204`. Past tickets are kept for history; anyone still in line is marked `removed` and gets a notification saying the service is no longer available (mock email too if they opted in). The admin UI asks for confirmation first, saying how many people are in line |
 
 | Field | Rule | Default |
 |---|---|---|
@@ -144,7 +144,7 @@ History is queried from the persisted queue entries. Each item has `ticket`, `st
 
 ## Notifications API
 
-Created automatically by the queue routes: when a user joins or leaves, when they become first in line ("You are next", sent once per ticket), when they are called, served, marked a no-show, or removed by staff. The front end shows them on the user's Home page. Users who ticked "Email me when it's almost my turn" (`emailMe`) also get the "you are next" one by mock email: it is logged by the server and marked `emailed: true`, since no real email is sent yet.
+Created automatically by the queue and service routes: when a user joins or leaves, when the service they are waiting for is deleted, when they become first in line ("You are next", sent once per ticket), when they are called, served, marked a no-show, or removed by staff. The front end shows them on the user's Home page. Users who ticked "Email me when it's almost my turn" (`emailMe`) also get the "you are next" one by mock email: it is logged by the server and marked `emailed: true`, since no real email is sent yet.
 
 | Method | Path | Who | Returns |
 |---|---|---|---|
@@ -162,7 +162,7 @@ The admin **Reports** tab uses this to show a report for their place and to down
 - `summary`: total tickets, customers, served, left, no-shows, removed, `averageWaitMinutes` (join → called), `averageServiceMinutes` (called → done)
 - `services`: each service's details (priority, duration, status, hours) and activity (tickets, served, no-shows, left, average wait). Deleted services show status `Deleted` and keep their history
 - `customers`: each customer's participation (visits, served, no-shows, left, last visit)
-- `visits`: every ticket in the range, newest first
+- `visits`: every ticket in the range, newest first. `serviceName` is the name when the person joined and `currentServiceName` is today's name; after a rename the page and CSV show "Old name (now New name)". Totals and the service filter use the service id, so a renamed service's old and new tickets are counted together
 
 The CSV has the same four sections, separated by blank lines. For a PDF, the Reports tab's **Print / PDF** button prints just the report (nav and filters hidden), so the browser's "Save as PDF" makes the file. Invalid dates, `to` before `from`, or a non-numeric `serviceId` return 400.
 

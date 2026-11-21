@@ -201,7 +201,6 @@ async function adminQueues(placeId) {
       })),
       nowServing: serving ? {
         ...serving,
-        started: new Date(serving.startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
         minutesIn: Math.max(0, Math.floor((Date.now() - Date.parse(serving.startedAt)) / 60000)),
         minutesLeft: Math.ceil(await servingMinutesLeft(service, serving)),
       } : null,

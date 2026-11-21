@@ -7,6 +7,7 @@ const serviceRepo = require('./serviceRepo')
 const queueRepo = require('./queueRepo')
 const { PRIORITIES } = require('./queues')
 const { requireAuth, requireAdmin } = require('./auth')
+const { addNotification, sendMockEmail } = require('./notifications')
 const { checkText, checkWholeNumber, checkOneOf, checkTime, checkTrueFalse, findErrors } = require('./validation')
 
 const STATUSES = ['Open', 'Paused', 'Closed']
@@ -108,7 +109,18 @@ router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   if (service.placeId !== req.user.placeId) {
     return res.status(403).json({ error: 'You can only change services at your own place.' })
   }
-  await serviceRepo.remove(req.params.id, req.user.placeId)
+  const result = await serviceRepo.remove(req.params.id, req.user.placeId)
+  if (!result) return res.status(404).json({ error: 'Service not found.' })
+
+  // Everyone who was in line is told why their ticket was cancelled (and emailed if they opted in)
+  for (const userId of result.removedUserIds) {
+    const notification = await addNotification(
+      userId,
+      'Status change',
+      `${service.name} is no longer available, so your ticket was cancelled. Sorry for the inconvenience!`,
+    )
+    await sendMockEmail(notification)
+  }
   res.status(204).end()
 })
 

@@ -133,6 +133,15 @@ function AdminWorkspace({ goTo, initialPage = 'overview' }) {
       setEditing(false)
       return
     }
+    // Warn before deleting, especially when people are still in line
+    const service = services.find((item) => item.id === selectedServiceId)
+    const inLine = (service?.waiting || 0) + (service?.nowServing ? 1 : 0)
+    const name = service?.name || 'this service'
+    const warning = inLine > 0
+      ? `${inLine} ${inLine === 1 ? 'person is' : 'people are'} in line for ${name}. Deleting it will cancel their tickets and notify them. Delete anyway?`
+      : `Delete ${name}? Its past visits stay in History and Reports.`
+    if (!window.confirm(warning)) return
+
     setError('')
     try {
       await api.deleteService(selectedServiceId)

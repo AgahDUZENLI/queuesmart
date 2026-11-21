@@ -1,7 +1,7 @@
 const request = require('supertest')
 const { createApp } = require('../src/app')
 const db = require('../src/db')
-const { readReportFilters, csvCell, reportToCsv, buildReport } = require('../src/reports')
+const { readReportFilters, csvCell, reportToCsv, buildReport, localTime } = require('../src/reports')
 
 const auth = (response) => ({ Authorization: `Bearer ${response.body.token}` })
 
@@ -86,6 +86,18 @@ describe('CSV helpers', () => {
   })
 })
 
+describe('time zone', () => {
+  test('tests run on Houston time, like the Docker backend', () => {
+    expect(process.env.TZ).toBe('America/Chicago')
+  })
+
+  test('CSV times are local office time, not UTC', () => {
+    expect(localTime('2026-11-15T15:00:00Z')).toBe('2026-11-15 09:00') // CST
+    expect(localTime('2026-07-01T15:00:00Z')).toBe('2026-07-01 10:00') // CDT
+    expect(localTime(null)).toBe('')
+  })
+})
+
 describe('GET /api/reports', () => {
   test('is for admins only', async () => {
     await request(app).get('/api/reports').expect(401)
@@ -98,9 +110,9 @@ describe('GET /api/reports', () => {
     expect(body.summary).toMatchObject({ total: 4, customers: 2, served: 2, noShow: 1, left: 1, averageWaitMinutes: 11, averageServiceMinutes: 15 })
     expect(body.visits.map((visit) => visit.ticket)).toEqual(['A-002', 'A-001', 'T-002', 'T-001'])
     expect(body.visits[0]).toMatchObject({ name: 'Bob Test', email: 'bob@example.edu', serviceName: 'Advising', waitedMinutes: 4, servedMinutes: 10 })
-    expect(body.services).toEqual([
-      expect.objectContaining({ name: 'Transcripts', tickets: 2, served: 1, noShow: 1, averageWaitMinutes: 15, hours: '09:00-16:30', status: 'Open' }),
+    expect(body.services).toEqual([ // sorted by name
       expect.objectContaining({ name: 'Advising', priority: 'High', tickets: 2, served: 1, left: 1, averageWaitMinutes: 4 }),
+      expect.objectContaining({ name: 'Transcripts', tickets: 2, served: 1, noShow: 1, averageWaitMinutes: 15, hours: '09:00-16:30', status: 'Open' }),
     ])
     expect(body.customers).toEqual([
       expect.objectContaining({ name: 'Ada Test', visits: 2, served: 1, left: 1 }),
@@ -116,6 +128,11 @@ describe('GET /api/reports', () => {
     expect(byService.body.services.map((service) => service.name)).toEqual(['Transcripts'])
     expect(byService.body.summary.total).toBe(2)
 
+    // 9 PM in Houston on Nov 2 is already Nov 3 in UTC, but it still counts as Nov 2
+    await db.query("UPDATE queue_entry SET joined_at = '2026-11-03T03:00:00Z' WHERE id = 2")
+    const lateNight = await request(app).get('/api/reports?from=2026-11-02&to=2026-11-02').set(adminAuth).expect(200)
+    expect(lateNight.body.visits.map((visit) => visit.ticket)).toEqual(['T-002', 'T-001'])
+
     const bad = await request(app).get('/api/reports?from=yesterday').set(adminAuth).expect(400)
     expect(bad.body.fields.from).toBeTruthy()
   })
@@ -125,6 +142,17 @@ describe('GET /api/reports', () => {
     const { body } = await request(app).get('/api/reports').set(adminAuth).expect(200)
     expect(body.services.find((service) => service.name === 'Advising').status).toBe('Deleted')
     expect(body.summary.total).toBe(4)
+  })
+
+  test('keeps old service names on past tickets but groups them under the renamed service', async () => {
+    await request(app).put(`/api/services/${transcriptsId}`).set(adminAuth).send({ name: 'Registrar' }).expect(200)
+    const { body } = await request(app).get(`/api/reports?serviceId=${transcriptsId}`).set(adminAuth).expect(200)
+    expect(body.services).toEqual([expect.objectContaining({ name: 'Registrar', tickets: 2, served: 1 })])
+    expect(body.visits[0]).toMatchObject({ serviceName: 'Transcripts', currentServiceName: 'Registrar' })
+
+    const csv = (await request(app).get(`/api/reports?format=csv&serviceId=${transcriptsId}`).set(adminAuth)).text
+    expect(csv).toContain(',Transcripts (now Registrar),served,')
+    expect(csv).toContain('Registrar,Normal,15,Open,')
   })
 
   test('downloads the report as CSV', async () => {
@@ -137,7 +165,7 @@ describe('GET /api/reports', () => {
     expect(csv).toMatch(/Summary\nTotal tickets/)
     expect(csv).toContain('Advising,High,15,Open,09:00-16:30,2,1,0,1,4')
     expect(csv).toContain('Bob Test,bob@example.edu,1,1,0,0,')
-    expect(csv).toContain(',A-002,Bob Test,bob@example.edu,Advising,served,4,10,')
+    expect(csv).toContain('2026-11-15 09:00,A-002,Bob Test,bob@example.edu,Advising,served,4,10,2026-11-15 09:14')
     expect(csv).not.toContain('T-001')
   })
 })

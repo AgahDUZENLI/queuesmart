@@ -144,4 +144,5 @@ module.exports = {
   router,
   addNotification,
   notifyNextInLine,
+  sendMockEmail,
 }
