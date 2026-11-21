@@ -186,6 +186,9 @@ describe('database-backed queue lifecycle', () => {
     await db.query('UPDATE queue_entry SET started_at = $2 WHERE id = $1', [entries[0].id, startedAt])
     expect((await request(app).get('/api/queues/me').set(otherUserAuth)).body.ticket.estimatedWaitMinutes).toBe(5)
     expect((await request(app).get(`/api/services?placeId=${placeId}`)).body.services[0].wait).toBe(20)
+    // Admins get the raw start time; the browser formats it in the viewer's time zone
+    const serving = (await request(app).get('/api/queues/mine').set(adminAuth)).body.services[0].nowServing
+    expect(serving).toMatchObject({ startedAt, minutesIn: 10 })
 
     await request(app).post(`/api/queues/${serviceId}/complete`).set(adminAuth)
     const summary = await request(app).get('/api/queues/mine').set(adminAuth)

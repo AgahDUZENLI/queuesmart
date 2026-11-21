@@ -1,6 +1,6 @@
 # QueueSmart Backend
 
-Node.js + Express with PostgreSQL persistence. Accounts, places, saved places, services, queues, queue entries, and sessions are stored in the database. Notifications remain in memory and reset when the server restarts.
+Node.js + Express with PostgreSQL persistence. Accounts, places, saved places, services, queues, queue entries, notifications and sessions are all stored in the database.
 
 ```bash
 cd backend
@@ -52,7 +52,7 @@ Deliberate edge cases, so reports and the UI get tested properly (full list at t
 | `src/placeRepo.js` | Places and saved-place relationships |
 | `src/serviceRepo.js` | Services and their queues |
 | `src/queueRepo.js` | Queue entries and queue lifecycle |
-| `src/data.js` | In-memory notifications |
+| `src/data.js` | Leftover from A3 (in-memory notifications); no longer used now that notifications are in the database |
 | `src/validation.js` | Field checks: required, type, length, email, password |
 | `src/auth.js` | Authentication routes plus `requireAuth` / `requireAdmin` |
 | `src/places.js` | Places, join codes and users' saved places |
@@ -168,8 +168,8 @@ The CSV has the same four sections, separated by blank lines. For a PDF, the Rep
 
 ## Adding a module
 
-1. Create `src/<name>.js` with an Express router (see `src/auth.js`).
-2. Add your arrays to `data` and `reset()` in `src/data.js`.
+1. Add any new tables to `db/schema.sql` (and `db/schema.dbml`).
+2. Create `src/<name>.js` with an Express router (see `src/reports.js`), querying through `src/db.js`.
 3. Mount the router in `src/app.js`: `app.use('/api/<name>', require('./<name>').router)`.
 4. Protect routes with `requireAuth` and `requireAdmin` from `src/auth.js`.
-5. Add tests in `tests/<name>.test.js`.
+5. Add tests in `tests/<name>.test.js`. They run against pg-mem with the real schema (see `tests/setup.js`).

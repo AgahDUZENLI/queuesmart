@@ -48,7 +48,7 @@ function adminService(service) {
     })),
     nowServing: service.nowServing ? {
       ...publicTicket(service.nowServing),
-      started: service.nowServing.started,
+      startedAt: service.nowServing.startedAt,
       minutesIn: service.nowServing.minutesIn,
       minutesLeft: service.nowServing.minutesLeft,
     } : null,
