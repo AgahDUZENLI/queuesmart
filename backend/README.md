@@ -35,6 +35,7 @@ Demo user logins (all use password `demo-pass-123`): `user@queuesmart.test` (May
 | `src/services.js` | Service management routes |
 | `src/queues.js` | Queue tickets, priority ordering, serving and wait estimates |
 | `src/notifications.js` | Notifications sent to users about their tickets |
+| `src/reports.js` | Admin report (customers, services, usage statistics) as JSON or CSV |
 
 ## Auth API
 
@@ -124,6 +125,21 @@ Created automatically by the queue routes: when a user joins or leaves, when the
 |---|---|---|---|
 | GET | `/api/notifications/me` | signed in | `200 { notifications }`, newest first: `{ id, type, message, createdAt, read, emailed }` |
 | POST | `/api/notifications/:id/read` | signed in (owner) | `200 { notification }`, or `404` |
+
+## Reports API
+
+The admin **Reports** tab uses this to show a report for their place and to download it. Built from the persisted queue entries, services and user profiles.
+
+| Method | Path | Who | Query | Returns |
+|---|---|---|---|---|
+| GET | `/api/reports` | admin | `from?`, `to?` (`YYYY-MM-DD`, by join day), `serviceId?`, `format?` (`csv`) | `200 { place, generatedAt, filters, summary, services, customers, visits }`, or a `queuesmart-report.csv` download when `format=csv` |
+
+- `summary`: total tickets, customers, served, left, no-shows, removed, `averageWaitMinutes` (join → called), `averageServiceMinutes` (called → done)
+- `services`: each service's details (priority, duration, status, hours) and activity (tickets, served, no-shows, left, average wait). Deleted services show status `Deleted` and keep their history
+- `customers`: each customer's participation (visits, served, no-shows, left, last visit)
+- `visits`: every ticket in the range, newest first
+
+The CSV has the same four sections, separated by blank lines. For a PDF, the Reports tab's **Print / PDF** button prints just the report (nav and filters hidden), so the browser's "Save as PDF" makes the file. Invalid dates, `to` before `from`, or a non-numeric `serviceId` return 400.
 
 ## Adding a module
 

@@ -7,6 +7,7 @@ const services = require('./services')
 const queues = require('./queues')
 const history = require('./history')
 const notifications = require('./notifications')
+const reports = require('./reports')
 function createApp() {
   const app = express()
   app.use(cors())
@@ -22,6 +23,7 @@ function createApp() {
   app.use('/api/queues', queues.router)
   app.use('/api/history', history.router)
   app.use('/api/notifications', notifications.router)
+  app.use('/api/reports', reports.router)
   app.use((req, res) => res.status(404).json({ error: 'Not found.' }))
 
   // Bad JSON bodies (status 400) and unexpected errors (500)

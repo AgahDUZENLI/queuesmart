@@ -91,3 +91,25 @@ export const getPlaceHistory = (status) => request('GET', `/api/history?limit=10
 export const getPlaceStats = () => request('GET', '/api/history/stats')
 export const getMyNotifications = () => request('GET', '/api/notifications/me')
 export const markNotificationRead = (id) => request('POST', `/api/notifications/${id}/read`)
+
+// Admin report: filters are { from, to, serviceId }, each optional
+function reportQuery(filters, extra = {}) {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries({ ...filters, ...extra })) if (value) params.set(key, value)
+  const query = params.toString()
+  return `/api/reports${query ? `?${query}` : ''}`
+}
+export const getReport = (filters) => request('GET', reportQuery(filters))
+
+// Downloads the same report as a CSV file
+export async function downloadReportCsv(filters) {
+  const response = await fetch(`${API_URL}${reportQuery(filters, { format: 'csv' })}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!response.ok) throw new Error((await response.json()).error || 'Could not download the report.')
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(await response.blob())
+  link.download = `queuesmart-report-${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(link.href)
+}

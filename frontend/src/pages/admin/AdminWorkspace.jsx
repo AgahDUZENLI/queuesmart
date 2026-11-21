@@ -3,11 +3,12 @@ import './admin.css'
 import AdminDashboard from './AdminDashboard'
 import QueueManagement from './QueueManagement'
 import AdminHistory from './AdminHistory'
+import AdminReports from './AdminReports'
 import ServiceManagement from './ServiceManagement'
 import * as api from '../../api'
 import { signOut } from '../../api'
 
-const TABS = { overview: 'Overview', queues: 'Queues', services: 'Services', history: 'History' }
+const TABS = { overview: 'Overview', queues: 'Queues', services: 'Services', history: 'History', reports: 'Reports' }
 
 const emptyService = {
   name: '',
@@ -233,6 +234,7 @@ function AdminWorkspace({ goTo, initialPage = 'overview' }) {
               />
             )}
             {activePage === 'history' && <AdminHistory />}
+            {activePage === 'reports' && <AdminReports services={services} />}
             {activePage === 'services' && (
               <ServiceManagement
                 services={services}
