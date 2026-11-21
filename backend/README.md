@@ -16,6 +16,30 @@ Demo accounts, places and services are loaded on startup from `src/demo.js`. Dem
 
 Demo user logins (all use password `demo-pass-123`): `user@queuesmart.test` (Maya Robinson), `user2@queuesmart.test` (Jordan Lee), `user3@queuesmart.test` (Priya Shah), and `user4@queuesmart.test` (Sam Carter). Each demo user has the Student Services Center saved.
 
+## Example data (seed)
+
+For demos and reports, load six weeks of realistic queue history at the Student Services Center:
+
+```bash
+docker compose exec backend npm run seed   # or: cd backend && npm run seed
+```
+
+It adds 17 more users (all with password `demo-pass-123`, emails like `liam@queuesmart.test`) and about 700 tickets: weekdays only, busier Mondays, served visits, no-shows, people who left, and tickets removed by staff. It also fills the live queues right now (someone being served at Academic Advising with a line behind them). It runs once; to start over, run `docker compose down -v && docker compose up -d` (this wipes the database) and seed again. The data is generated from a fixed random seed, with dates relative to today.
+
+Deliberate edge cases, so reports and the UI get tested properly (full list at the top of `src/seed.js`):
+
+| Edge case | Where to see it |
+|---|---|
+| Names with an apostrophe, accents, quotes and a comma (`Liam O'Connor`, `José Núñez`, `Chris "CJ" Johnson`, `Robert Davis, Jr.`) | Reports → Customers, and the CSV (quoted correctly) |
+| Noah Kim registered but never joined; Zoe Patel only visited the clinic and tire shop | Neither appears in the campus report |
+| Jordan Lee visits constantly; Ethan Brooks keeps not showing up; Sofia Martinez keeps leaving | Reports → Customers |
+| Financial Aid deadline-day rush: waits over 4 hours, people still waiting at closing removed | Reports → Queue history, filtered to Financial Aid |
+| 0-minute waits, 1-minute visits, Counseling visits over an hour | Reports → Queue history |
+| Staff-raised High priority tickets served ahead of earlier arrivals | Queue history / live Academic Advising line |
+| Registrar renamed: old tickets keep the name "Transcripts & Records" | Reports → Queue history |
+| Library Help Desk deleted four weeks ago, history kept | Reports → Services shows it as Deleted |
+| Career Coaching never had a visitor | Reports → Services shows 0 tickets |
+
 ## Files
 
 | File | What it does |
@@ -35,6 +59,7 @@ Demo user logins (all use password `demo-pass-123`): `user@queuesmart.test` (May
 | `src/services.js` | Service management routes |
 | `src/queues.js` | Queue tickets, priority ordering, serving and wait estimates |
 | `src/notifications.js` | Notifications sent to users about their tickets |
+| `src/seed.js` | Example users and six weeks of queue history (`npm run seed`) |
 | `src/reports.js` | Admin report (customers, services, usage statistics) as JSON or CSV |
 
 ## Auth API

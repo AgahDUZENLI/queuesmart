@@ -1,5 +1,4 @@
 -- QueueSmart database schema (PostgreSQL). Matches schema.dbml, plus the rules
--- DBML can't express: CHECK constraints and partial unique indexes.
 -- Docker runs this file the first time the database volume is created.
 
 CREATE TYPE user_role AS ENUM ('user', 'admin');
